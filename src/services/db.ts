@@ -11,16 +11,32 @@ db.version(1).stores({
   locations: '++id, name',
 });
 
-export async function seedDefaultLocations() {
-  const count = await db.locations.count();
-  if (count === 0) {
-    await db.locations.bulkAdd([
-      { name: 'Fridge', icon: '🧊' },
-      { name: 'Freezer', icon: '❄️' },
-      { name: 'Pantry', icon: '🗄️' },
-      { name: 'Counter', icon: '🍎' },
-    ]);
+db.on('populate', (tx) => {
+  tx.table('locations').bulkAdd([
+    { name: 'Fridge', icon: '🧊' },
+    { name: 'Freezer', icon: '❄️' },
+    { name: 'Pantry', icon: '🗄️' },
+    { name: 'Counter', icon: '🍎' },
+  ]);
+});
+
+let seedPromise: Promise<void> | null = null;
+
+export function seedDefaultLocations(): Promise<void> {
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      const count = await db.locations.count();
+      if (count === 0) {
+        await db.locations.bulkAdd([
+          { name: 'Fridge', icon: '🧊' },
+          { name: 'Freezer', icon: '❄️' },
+          { name: 'Pantry', icon: '🗄️' },
+          { name: 'Counter', icon: '🍎' },
+        ]);
+      }
+    })();
   }
+  return seedPromise;
 }
 
 export { db };

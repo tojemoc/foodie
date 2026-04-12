@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import type { Location, FoodItem } from '../types';
 
@@ -7,7 +7,6 @@ export default function LocationsPage() {
   const [items, setItems] = useState<FoodItem[]>([]);
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('📦');
-  const didLoad = useRef(false);
 
   const loadData = async () => {
     const [locs, allItems] = await Promise.all([
@@ -19,16 +18,18 @@ export default function LocationsPage() {
   };
 
   useEffect(() => {
-    if (didLoad.current) return;
-    didLoad.current = true;
+    let cancelled = false;
     (async () => {
       const [locs, allItems] = await Promise.all([
         db.locations.toArray(),
         db.items.toArray(),
       ]);
-      setLocations(locs);
-      setItems(allItems);
+      if (!cancelled) {
+        setLocations(locs);
+        setItems(allItems);
+      }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   async function addLocation() {

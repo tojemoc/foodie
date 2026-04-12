@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import type { FoodItem, Location } from '../types';
@@ -12,20 +12,21 @@ export default function HomePage() {
   const [items, setItems] = useState<FoodItem[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
-  const didLoad = useRef(false);
 
   useEffect(() => {
-    if (didLoad.current) return;
-    didLoad.current = true;
+    let cancelled = false;
     (async () => {
       const [allItems, allLocs] = await Promise.all([
         db.items.toArray(),
         db.locations.toArray(),
       ]);
-      allItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-      setItems(allItems);
-      setLocations(allLocs);
+      if (!cancelled) {
+        allItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+        setItems(allItems);
+        setLocations(allLocs);
+      }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   async function handleDelete(id: number) {
