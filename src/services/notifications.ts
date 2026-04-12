@@ -16,18 +16,27 @@ function notifTypeForDays(days: number): NotifType | null {
   return null;
 }
 
+function localDateKey(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export async function checkExpiringSoon(): Promise<void> {
+  if (typeof Notification === 'undefined') return;
   if (Notification.permission !== 'granted') return;
 
   const items = await db.items.toArray();
-  const todayISO = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
 
   for (const item of items) {
     const days = daysUntilExpiry(new Date(item.expiryDate));
     const type = notifTypeForDays(days);
     if (!type) continue;
 
-    if (item.lastNotified?.type === type && item.lastNotified?.date === todayISO) continue;
+    if (item.lastNotified?.type === type && item.lastNotified?.date === today) continue;
 
     const titles: Record<NotifType, string> = {
       none: '', d3: 'Expiring Soon', d1: 'Expires Tomorrow!', exp: 'Expired!',
@@ -45,7 +54,7 @@ export async function checkExpiringSoon(): Promise<void> {
       tag: `expiry-${item.id}-${type}`,
     });
 
-    await db.items.update(item.id!, { lastNotified: { type, date: todayISO } });
+    await db.items.update(item.id!, { lastNotified: { type, date: today } });
   }
 }
 

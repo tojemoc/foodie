@@ -110,13 +110,18 @@ export default function AddItemPage() {
     setLoading(true);
     setLoadingMsg('Looking up product...');
     cleanup();
-    const product = await lookupProduct(code);
-    setLoading(false);
-    if (product) {
-      setProductName(product.name);
-      if (product.imageUrl) setProductImage(product.imageUrl);
+    try {
+      const product = await lookupProduct(code);
+      if (product) {
+        setProductName(product.name);
+        if (product.imageUrl) setProductImage(product.imageUrl);
+      }
+    } catch (err) {
+      console.error('Product lookup failed:', err);
+    } finally {
+      setLoading(false);
+      setStep('product');
     }
-    setStep('product');
   }
 
   function handleSkipBarcode() {
@@ -228,7 +233,7 @@ export default function AddItemPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <button className="back-btn" onClick={() => { cleanup(); navigate('/'); }}>←</button>
+        <button className="back-btn" aria-label="Go back" onClick={() => { cleanup(); navigate('/'); }}>←</button>
         <h1>Add Item</h1>
       </div>
 
@@ -391,39 +396,42 @@ export default function AddItemPage() {
       )}
 
       {/* STEP 6: Review */}
-      {step === 'review' && (
-        <>
-          <p className="section-title">Review & Save</p>
-          <div className="card" style={{ marginBottom: 16 }}>
-            {productImage && (
-              <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                <img src={productImage} alt="product" style={{ width: 80, borderRadius: 8 }} />
-              </div>
-            )}
-            <div style={{ marginBottom: 8 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Name</span>
-              <div style={{ fontWeight: 600 }}>{productName}</div>
-            </div>
-            {ean && (
+      {step === 'review' && (() => {
+        const selectedLoc = locations.find((l) => l.id === selectedLocation);
+        return (
+          <>
+            <p className="section-title">Review & Save</p>
+            <div className="card" style={{ marginBottom: 16 }}>
+              {productImage && (
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <img src={productImage} alt="product" style={{ width: 80, borderRadius: 8 }} />
+                </div>
+              )}
               <div style={{ marginBottom: 8 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>EAN</span>
-                <div>{ean}</div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Name</span>
+                <div style={{ fontWeight: 600 }}>{productName}</div>
               </div>
-            )}
-            <div style={{ marginBottom: 8 }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Expiry</span>
-              <div>{parseLocalDate(expiryDate).toLocaleDateString()}</div>
+              {ean && (
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>EAN</span>
+                  <div>{ean}</div>
+                </div>
+              )}
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Expiry</span>
+                <div>{parseLocalDate(expiryDate).toLocaleDateString()}</div>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Location</span>
+                <div>{selectedLoc?.icon} {selectedLoc?.name}</div>
+              </div>
             </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Location</span>
-              <div>{locations.find((l) => l.id === selectedLocation)?.icon} {locations.find((l) => l.id === selectedLocation)?.name}</div>
-            </div>
-          </div>
-          <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
-            ✓ Save Item
-          </button>
-        </>
-      )}
+            <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
+              ✓ Save Item
+            </button>
+          </>
+        );
+      })()}
     </div>
   );
 }

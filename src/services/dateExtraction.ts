@@ -18,7 +18,7 @@ function fixOcrMistakes(text: string): string {
 
 function isReasonableDate(d: Date): boolean {
   const now = new Date();
-  const fiveYearsAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+  const fiveYearsAgo = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
   const tenYearsLater = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
   return d >= fiveYearsAgo && d <= tenYearsLater;
 }

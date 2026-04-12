@@ -16,14 +16,18 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [allItems, allLocs] = await Promise.all([
-        db.items.toArray(),
-        db.locations.toArray(),
-      ]);
-      if (!cancelled) {
-        allItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-        setItems(allItems);
-        setLocations(allLocs);
+      try {
+        const [allItems, allLocs] = await Promise.all([
+          db.items.toArray(),
+          db.locations.toArray(),
+        ]);
+        if (!cancelled) {
+          allItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+          setItems(allItems);
+          setLocations(allLocs);
+        }
+      } catch (err) {
+        console.error('Failed to load items:', err);
       }
     })();
     return () => { cancelled = true; };
@@ -100,7 +104,7 @@ export default function HomePage() {
         ))
       )}
 
-      <button className="fab" onClick={() => navigate('/add')}>+</button>
+      <button className="fab" aria-label="Add item" onClick={() => navigate('/add')}>+</button>
     </div>
   );
 }

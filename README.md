@@ -29,9 +29,20 @@ The dev server starts at `http://localhost:5173`.
 | `npm run lint`    | Run ESLint                            |
 | `npm run preview` | Preview production build              |
 
+## Testing
+
+Tests are not configured yet. The intended command is `npm test`.
+
+## Caveats
+
+- **Camera APIs**: `getUserMedia` is unavailable in headless/VM environments. The add-item flow provides "Skip — Enter manually" buttons as a fallback.
+- **Notifications**: Browser notifications require user permission and may not display in headless Chrome, though scheduler logic still runs.
+- **Tesseract.js**: The first OCR call downloads English language data (~4 MB). Subsequent calls reuse the cached worker.
+- **Vite version**: Pinned to Vite 7.x for `vite-plugin-pwa` peer-dependency compatibility.
+
 ## Tech Stack
 
-React 19 · TypeScript · Vite · react-router-dom · Dexie.js · @zxing/library · tesseract.js · vite-plugin-pwa
+React 19 · TypeScript · Vite 7 · react-router-dom · Dexie.js · @zxing/library · tesseract.js · vite-plugin-pwa
 
 ## License
 

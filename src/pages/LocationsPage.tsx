@@ -37,7 +37,7 @@ export default function LocationsPage() {
     await db.locations.add({ name: newName.trim(), icon: newIcon });
     setNewName('');
     setNewIcon('📦');
-    loadData();
+    await loadData();
   }
 
   async function deleteLocation(id: number) {
@@ -47,7 +47,7 @@ export default function LocationsPage() {
       return;
     }
     await db.locations.delete(id);
-    loadData();
+    await loadData();
   }
 
   return (
@@ -65,7 +65,7 @@ export default function LocationsPage() {
               <div className="item-name">{loc.name}</div>
               <div className="item-location">{count} item{count !== 1 ? 's' : ''}</div>
             </div>
-            <button className="delete-btn" onClick={() => deleteLocation(loc.id!)}>✕</button>
+            <button className="delete-btn" aria-label={`Delete ${loc.name}`} onClick={() => deleteLocation(loc.id!)}>✕</button>
           </div>
         );
       })}

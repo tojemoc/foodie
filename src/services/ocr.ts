@@ -22,6 +22,13 @@ export async function recognizeText(canvas: HTMLCanvasElement): Promise<string> 
 }
 
 export async function terminateOCR() {
+  if (workerInitPromise) {
+    try {
+      await workerInitPromise;
+    } catch {
+      // init failed — nothing to terminate
+    }
+  }
   if (worker) {
     await worker.terminate();
     worker = null;
