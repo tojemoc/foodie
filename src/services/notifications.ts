@@ -28,33 +28,45 @@ export async function checkExpiringSoon(): Promise<void> {
   if (typeof Notification === 'undefined') return;
   if (Notification.permission !== 'granted') return;
 
-  const items = await db.items.toArray();
+  let items;
+  try {
+    items = await db.items.toArray();
+  } catch (err) {
+    console.error('Failed to retrieve items for notification check:', err);
+    return;
+  }
+
   const today = localDateKey();
 
   for (const item of items) {
-    const days = daysUntilExpiry(new Date(item.expiryDate));
-    const type = notifTypeForDays(days);
-    if (!type) continue;
+    try {
+      const days = daysUntilExpiry(new Date(item.expiryDate));
+      const type = notifTypeForDays(days);
+      if (!type) continue;
 
-    if (item.lastNotified?.type === type && item.lastNotified?.date === today) continue;
+      if (item.lastNotified?.type === type && item.lastNotified?.date === today) continue;
 
-    const titles: Record<NotifType, string> = {
-      none: '', d3: 'Expiring Soon', d1: 'Expires Tomorrow!', exp: 'Expired!',
-    };
-    const bodies: Record<NotifType, string> = {
-      none: '',
-      d3: `${item.name} expires in 3 days`,
-      d1: `${item.name} expires tomorrow`,
-      exp: `${item.name} has expired`,
-    };
+      const titles: Record<NotifType, string> = {
+        none: '', d3: 'Expiring Soon', d1: 'Expires Tomorrow!', exp: 'Expired!',
+      };
+      const bodies: Record<NotifType, string> = {
+        none: '',
+        d3: `${item.name} expires in 3 days`,
+        d1: `${item.name} expires tomorrow`,
+        exp: `${item.name} has expired`,
+      };
 
-    new Notification(titles[type], {
-      body: bodies[type],
-      icon: '/favicon.svg',
-      tag: `expiry-${item.id}-${type}`,
-    });
+      new Notification(titles[type], {
+        body: bodies[type],
+        icon: '/favicon.svg',
+        tag: `expiry-${item.id}-${type}`,
+      });
 
-    await db.items.update(item.id!, { lastNotified: { type, date: today } });
+      await db.items.update(item.id!, { lastNotified: { type, date: today } });
+    } catch (err) {
+      console.error(`Failed to process notification for item ${item.id}:`, err);
+      continue;
+    }
   }
 }
 

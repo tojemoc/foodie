@@ -9,45 +9,48 @@ export default function LocationsPage() {
   const [newIcon, setNewIcon] = useState('📦');
 
   const loadData = async () => {
-    const [locs, allItems] = await Promise.all([
-      db.locations.toArray(),
-      db.items.toArray(),
-    ]);
-    setLocations(locs);
-    setItems(allItems);
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    try {
       const [locs, allItems] = await Promise.all([
         db.locations.toArray(),
         db.items.toArray(),
       ]);
-      if (!cancelled) {
-        setLocations(locs);
-        setItems(allItems);
-      }
-    })();
-    return () => { cancelled = true; };
+      setLocations(locs);
+      setItems(allItems);
+    } catch (err) {
+      console.error('Failed to load locations data:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   async function addLocation() {
     if (!newName.trim()) return;
-    await db.locations.add({ name: newName.trim(), icon: newIcon });
-    setNewName('');
-    setNewIcon('📦');
-    await loadData();
+    try {
+      await db.locations.add({ name: newName.trim(), icon: newIcon });
+      setNewName('');
+      setNewIcon('📦');
+      await loadData();
+    } catch (err) {
+      console.error('Failed to add location:', err);
+      alert('Failed to add location. Please try again.');
+    }
   }
 
   async function deleteLocation(id: number) {
-    const itemCount = await db.items.where('locationId').equals(id).count();
-    if (itemCount > 0) {
-      alert(`Cannot delete \u2014 ${itemCount} items are stored here`);
-      return;
+    try {
+      const itemCount = await db.items.where('locationId').equals(id).count();
+      if (itemCount > 0) {
+        alert(`Cannot delete \u2014 ${itemCount} items are stored here`);
+        return;
+      }
+      await db.locations.delete(id);
+      await loadData();
+    } catch (err) {
+      console.error('Failed to delete location:', err);
+      alert('Failed to delete location. Please try again.');
     }
-    await db.locations.delete(id);
-    await loadData();
   }
 
   return (

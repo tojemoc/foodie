@@ -46,19 +46,27 @@ export default function AddItemPage() {
   const [cameraError, setCameraError] = useState('');
 
   useEffect(() => {
+    let mounted = true;
     db.locations.toArray().then((locs) => {
-      setLocations(locs);
-      if (locs.length > 0) setSelectedLocation(locs[0].id!);
+      if (mounted) {
+        setLocations(locs);
+        if (locs.length > 0) setSelectedLocation(locs[0].id!);
+      }
+    }).catch((err) => {
+      console.error('Failed to load locations:', err);
     });
     return () => {
+      mounted = false;
       cleanup();
     };
   }, []);
 
   function cleanup() {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    if (videoRef.current) videoRef.current.srcObject = null;
     stopCamera(streamRef.current);
     streamRef.current = null;
+    setFlashOn(false);
   }
 
   // Barcode scanning effect with cancellation support
@@ -93,6 +101,8 @@ export default function AddItemPage() {
             setEan(code);
             handleBarcodeFound(code);
           }
+        } catch (err) {
+          console.error('Barcode decode error:', err);
         } finally {
           decoding = false;
         }

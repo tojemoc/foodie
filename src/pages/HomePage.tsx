@@ -34,8 +34,13 @@ export default function HomePage() {
   }, []);
 
   async function handleDelete(id: number) {
-    await db.items.delete(id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
+    try {
+      await db.items.delete(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+      alert('Failed to delete item. Please try again.');
+    }
   }
 
   const filtered = filter === 'all'
