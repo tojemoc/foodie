@@ -1,0 +1,86 @@
+# Deploy Worker + Cloudflare Pages from a version tag (production).
+# Inspired by https://github.com/tojemoc/cardex/blob/main/.github/workflows/release.yml
+#
+# Tag example: git tag v0.1.0 && git push origin v0.1.0
+#
+# Required GitHub secrets:
+#   CLOUDFLARE_API_TOKEN
+#   CLOUDFLARE_ACCOUNT_ID
+#   CLOUDFLARE_PAGES_PROJECT_PRODUCTION  — Pages project name (e.g. foodie)
+#
+# Checkout the tagged commit (`github.sha`) so production matches the tag, not the moving `main` tip.
+
+name: Release to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-worker-production:
+    runs-on: ubuntu-latest
+    name: Deploy Worker (production)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install worker dependencies
+        working-directory: worker
+        run: npm ci
+
+      - name: Typecheck worker
+        working-directory: worker
+        run: npm run typecheck
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy --var VERSION:${{ github.ref_name }}
+
+  deploy-frontend-production:
+    runs-on: ubuntu-latest
+    name: Deploy Pages (production)
+    needs: deploy-worker-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT_PRODUCTION }} --branch=main
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

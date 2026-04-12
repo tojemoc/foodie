@@ -22,7 +22,24 @@ export default function LocationsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [locs, allItems] = await Promise.all([
+          db.locations.toArray(),
+          db.items.toArray(),
+        ]);
+        if (!cancelled) {
+          setLocations(locs);
+          setItems(allItems);
+        }
+      } catch (err) {
+        console.error('Failed to load locations data:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function addLocation() {
