@@ -1,6 +1,6 @@
 # Agents
 
-## Cursor Cloud specific instructions
+## Cursor-Cloud-specific instructions
 
 This repository ("foodie") is currently an empty/greenfield project with only a `README.md` and `LICENSE` file. There is no application code, no build system, no dependencies, and no tests.
 
