@@ -32,7 +32,7 @@ export default function ItemCard({ item, location, onDelete }: Props) {
       <span className={`expiry-badge ${status}`}>
         {formatExpiry(days)}
       </span>
-      <button className="delete-btn" onClick={(e) => { e.stopPropagation(); onDelete(item.id!); }} title="Delete">
+      <button className="delete-btn" aria-label={`Delete ${item.name}`} onClick={(e) => { e.stopPropagation(); onDelete(item.id!); }} title="Delete">
         ✕
       </button>
     </div>

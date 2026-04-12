@@ -41,9 +41,9 @@ export default function LocationsPage() {
   }
 
   async function deleteLocation(id: number) {
-    const itemCount = items.filter((i) => i.locationId === id).length;
+    const itemCount = await db.items.where('locationId').equals(id).count();
     if (itemCount > 0) {
-      alert(`Cannot delete — ${itemCount} items are stored here`);
+      alert(`Cannot delete \u2014 ${itemCount} items are stored here`);
       return;
     }
     await db.locations.delete(id);
@@ -53,7 +53,7 @@ export default function LocationsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>📍 Locations</h1>
+        <h1>Locations</h1>
       </div>
 
       {locations.map((loc) => {

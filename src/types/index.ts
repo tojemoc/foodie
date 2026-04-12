@@ -5,6 +5,7 @@ export interface FoodItem {
   expiryDate: Date;
   locationId: number;
   imageUrl?: string;
+  lastNotified?: { type: 'none' | 'd3' | 'd1' | 'exp'; date: string };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,21 +37,17 @@ export interface ProductInfo {
 
 export type ExpiryStatus = 'fresh' | 'expiring-soon' | 'expired';
 
+function utcDays(d: Date): number {
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 export function getExpiryStatus(expiryDate: Date): ExpiryStatus {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDate);
-  expiry.setHours(0, 0, 0, 0);
-  const diffDays = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((utcDays(new Date(expiryDate)) - utcDays(new Date())) / 86_400_000);
   if (diffDays < 0) return 'expired';
   if (diffDays <= 3) return 'expiring-soon';
   return 'fresh';
 }
 
 export function daysUntilExpiry(expiryDate: Date): number {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDate);
-  expiry.setHours(0, 0, 0, 0);
-  return Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.floor((utcDays(new Date(expiryDate)) - utcDays(new Date())) / 86_400_000);
 }

@@ -1,5 +1,9 @@
 export function preprocessForOCR(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  const ctx = canvas.getContext('2d')!;
+  if (canvas.width <= 0 || canvas.height <= 0) return canvas;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
 
@@ -19,7 +23,8 @@ export function preprocessForOCR(canvas: HTMLCanvasElement): HTMLCanvasElement {
     const upscaled = document.createElement('canvas');
     upscaled.width = canvas.width * scale;
     upscaled.height = canvas.height * scale;
-    const uctx = upscaled.getContext('2d')!;
+    const uctx = upscaled.getContext('2d');
+    if (!uctx) return canvas;
     uctx.imageSmoothingEnabled = false;
     uctx.drawImage(canvas, 0, 0, upscaled.width, upscaled.height);
     return upscaled;

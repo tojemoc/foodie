@@ -1,12 +1,17 @@
 import { createWorker, type Worker } from 'tesseract.js';
 
 let worker: Worker | null = null;
+let workerInitPromise: Promise<Worker> | null = null;
 
 async function getWorker(): Promise<Worker> {
-  if (!worker) {
-    worker = await createWorker('eng');
+  if (worker) return worker;
+  if (!workerInitPromise) {
+    workerInitPromise = createWorker('eng').then(
+      (w) => { worker = w; workerInitPromise = null; return w; },
+      (err) => { workerInitPromise = null; throw err; },
+    );
   }
-  return worker;
+  return workerInitPromise;
 }
 
 export async function recognizeText(canvas: HTMLCanvasElement): Promise<string> {

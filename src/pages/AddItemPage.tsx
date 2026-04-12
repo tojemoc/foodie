@@ -11,6 +11,18 @@ import type { Location, DateExtractionResult } from '../types';
 
 type Step = 'barcode' | 'product' | 'expiry-scan' | 'expiry-confirm' | 'location' | 'review';
 
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateForInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function AddItemPage() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -21,6 +33,7 @@ export default function AddItemPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [flashOn, setFlashOn] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const [ean, setEan] = useState('');
   const [productName, setProductName] = useState('');
@@ -48,35 +61,46 @@ export default function AddItemPage() {
     streamRef.current = null;
   }
 
-  async function initCamera() {
-    setCameraError('');
-    if (!videoRef.current) return;
-    try {
-      cleanup();
-      const stream = await startCamera(videoRef.current);
-      streamRef.current = stream;
-    } catch {
-      setCameraError('Could not access camera. Please allow camera permission or enter data manually.');
-    }
-  }
-
-  // Step: Barcode scanning
+  // Barcode scanning effect with cancellation support
   useEffect(() => {
-    if (step === 'barcode') {
-      initCamera().then(() => {
-        if (!videoRef.current) return;
-        scanIntervalRef.current = setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
+    if (step !== 'barcode') return;
+    let cancelled = false;
+    let decoding = false;
+    let barcodeHandled = false;
+
+    (async () => {
+      setCameraError('');
+      if (!videoRef.current) return;
+      try {
+        cleanup();
+        const stream = await startCamera(videoRef.current);
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+      } catch {
+        if (!cancelled) setCameraError('Could not access camera. Please allow camera permission or enter data manually.');
+        return;
+      }
+
+      scanIntervalRef.current = setInterval(async () => {
+        if (cancelled || barcodeHandled || decoding) return;
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        decoding = true;
+        try {
           const code = await decodeBarcodeFromVideo(videoRef.current);
-          if (code) {
+          if (code && !cancelled && !barcodeHandled) {
+            barcodeHandled = true;
             if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
             setEan(code);
             handleBarcodeFound(code);
           }
-        }, 500);
-      });
-    }
+        } finally {
+          decoding = false;
+        }
+      }, 500);
+    })();
+
     return () => {
+      cancelled = true;
       if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,12 +129,23 @@ export default function AddItemPage() {
     setStep('expiry-scan');
   }
 
-  // Step: OCR expiry scan
+  // OCR expiry scan camera init with cancellation
   useEffect(() => {
-    if (step === 'expiry-scan') {
-      initCamera();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (step !== 'expiry-scan') return;
+    let cancelled = false;
+    (async () => {
+      setCameraError('');
+      if (!videoRef.current) return;
+      try {
+        cleanup();
+        const stream = await startCamera(videoRef.current);
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
+      } catch {
+        if (!cancelled) setCameraError('Could not access camera. Please allow camera permission or enter data manually.');
+      }
+    })();
+    return () => { cancelled = true; };
   }, [step]);
 
   async function handleCaptureExpiry() {
@@ -119,26 +154,30 @@ export default function AddItemPage() {
     setLoading(true);
     setLoadingMsg('Reading expiry date...');
 
-    const vw = videoRef.current.videoWidth;
-    const vh = videoRef.current.videoHeight;
-    const roi = { x: vw * 0.1, y: vh * 0.35, w: vw * 0.8, h: vh * 0.3 };
+    try {
+      const vw = videoRef.current.videoWidth;
+      const vh = videoRef.current.videoHeight;
+      const roi = { x: vw * 0.1, y: vh * 0.35, w: vw * 0.8, h: vh * 0.3 };
 
-    const frame = captureFrame(videoRef.current, roi);
-    const processed = preprocessForOCR(frame);
-    const text = await recognizeText(processed);
+      const frame = captureFrame(videoRef.current, roi);
+      const processed = preprocessForOCR(frame);
+      const text = await recognizeText(processed);
 
-    setOcrRaw(text);
-    const dates = extractDates(text);
-    setDateResults(dates);
+      setOcrRaw(text);
+      const dates = extractDates(text);
+      setDateResults(dates);
 
-    if (dates.length > 0) {
-      const best = dates[0];
-      setExpiryDate(formatDateForInput(best.date));
+      if (dates.length > 0) {
+        setExpiryDate(formatDateForInput(dates[0].date));
+      }
+      setStep('expiry-confirm');
+    } catch (err) {
+      console.error('OCR capture failed:', err);
+      setCameraError('Failed to read text. Please try again or enter manually.');
+    } finally {
+      setLoading(false);
+      cleanup();
     }
-
-    setLoading(false);
-    cleanup();
-    setStep('expiry-confirm');
   }
 
   function handleSkipExpiry() {
@@ -157,27 +196,33 @@ export default function AddItemPage() {
   }
 
   async function handleSave() {
-    await db.items.add({
-      name: productName,
-      ean: ean || undefined,
-      expiryDate: new Date(expiryDate),
-      locationId: selectedLocation,
-      imageUrl: productImage || undefined,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    navigate('/');
-  }
-
-  function handleFlash() {
-    if (streamRef.current) {
-      setFlashOn(!flashOn);
-      toggleFlashlight(streamRef.current, !flashOn);
+    setLoading(true);
+    setLoadingMsg('Saving...');
+    setSaveError('');
+    try {
+      await db.items.add({
+        name: productName,
+        ean: ean || undefined,
+        expiryDate: parseLocalDate(expiryDate),
+        locationId: selectedLocation,
+        imageUrl: productImage || undefined,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to save item:', err);
+      setSaveError('Failed to save. Please try again.');
+    } finally {
+      setLoading(false);
     }
   }
 
-  function formatDateForInput(d: Date): string {
-    return d.toISOString().split('T')[0];
+  async function handleFlash() {
+    if (streamRef.current) {
+      const success = await toggleFlashlight(streamRef.current, !flashOn);
+      if (success) setFlashOn(!flashOn);
+    }
   }
 
   return (
@@ -193,6 +238,8 @@ export default function AddItemPage() {
           <span>{loadingMsg}</span>
         </div>
       )}
+
+      {saveError && <div className="status-banner warning">{saveError}</div>}
 
       {/* STEP 1: Barcode */}
       {step === 'barcode' && (
@@ -294,7 +341,7 @@ export default function AddItemPage() {
                     />
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                    Matched: "{d.rawText}"
+                    Matched: &quot;{d.rawText}&quot;
                   </div>
                 </div>
               ))}
@@ -302,7 +349,7 @@ export default function AddItemPage() {
           )}
           {ocrRaw && dateResults.length === 0 && (
             <div className="status-banner warning">
-              No dates found in: "{ocrRaw.substring(0, 100)}"
+              No dates found in: &quot;{ocrRaw.substring(0, 100)}&quot;
             </div>
           )}
           <div className="form-group">
@@ -365,14 +412,14 @@ export default function AddItemPage() {
             )}
             <div style={{ marginBottom: 8 }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Expiry</span>
-              <div>{new Date(expiryDate).toLocaleDateString()}</div>
+              <div>{parseLocalDate(expiryDate).toLocaleDateString()}</div>
             </div>
             <div>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Location</span>
               <div>{locations.find((l) => l.id === selectedLocation)?.icon} {locations.find((l) => l.id === selectedLocation)?.name}</div>
             </div>
           </div>
-          <button className="btn btn-primary" onClick={handleSave}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
             ✓ Save Item
           </button>
         </>

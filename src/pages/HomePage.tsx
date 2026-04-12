@@ -47,7 +47,7 @@ export default function HomePage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>🥑 Foodie</h1>
+        <h1>Foodie</h1>
       </div>
 
       <div className="stats-row">
@@ -77,11 +77,17 @@ export default function HomePage() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {items.length === 0 ? (
         <div className="empty-state">
           <span className="empty-icon">🛒</span>
           <h3>No items yet</h3>
           <p>Tap + to scan your first product</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-icon">🔍</span>
+          <h3>No matches</h3>
+          <p>No items match the selected filter</p>
         </div>
       ) : (
         filtered.map((item) => (

@@ -40,10 +40,19 @@ export function captureFrame(
   return canvas;
 }
 
-export function toggleFlashlight(stream: MediaStream, on: boolean) {
+export async function toggleFlashlight(stream: MediaStream, on: boolean): Promise<boolean> {
   const track = stream.getVideoTracks()[0];
-  if (track && 'applyConstraints' in track) {
+  if (!track) return false;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const capabilities = track.getCapabilities?.() as any;
+  if (!capabilities?.torch) return false;
+
+  try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    track.applyConstraints({ advanced: [{ torch: on } as any] }).catch(() => {});
+    await track.applyConstraints({ advanced: [{ torch: on } as any] });
+    return true;
+  } catch {
+    return false;
   }
 }

@@ -1,73 +1,38 @@
-# React + TypeScript + Vite
+# Foodie
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Grocery expiry tracking PWA with barcode scanning, OCR date extraction, and push notifications.
 
-Currently, two official plugins are available:
+## Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server starts at `http://localhost:5173`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Features
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **Barcode scanning** — Scan EAN/UPC barcodes using `@zxing/library` and auto-lookup products via the Open Food Facts API.
+- **OCR date extraction** — Capture expiry dates from packaging using `tesseract.js` with an image-preprocessing pipeline (grayscale, contrast, binarization, upscaling).
+- **Date parsing engine** — Regex-based extraction supporting DD/MM/YYYY, YYYY-MM-DD, MM/YY, DD MMM YYYY and more, with heuristic confidence scoring.
+- **IndexedDB persistence** — Local-first storage via `Dexie.js` for items and storage locations.
+- **Expiry notifications** — On-open checks for items expiring in 3 days, 1 day, or already expired.
+- **Installable PWA** — Service worker via `vite-plugin-pwa` (Workbox) with offline caching and add-to-homescreen support.
+
+## Scripts
+
+| Command           | Description                          |
+| ----------------- | ------------------------------------ |
+| `npm run dev`     | Start Vite dev server with HMR       |
+| `npm run build`   | TypeScript check + production build   |
+| `npm run lint`    | Run ESLint                            |
+| `npm run preview` | Preview production build              |
+
+## Tech Stack
+
+React 19 · TypeScript · Vite · react-router-dom · Dexie.js · @zxing/library · tesseract.js · vite-plugin-pwa
+
+## License
+
+[GPL-2.0](LICENSE)

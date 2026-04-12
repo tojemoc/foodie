@@ -1,8 +1,16 @@
 import type { ProductInfo } from '../types';
 
+const LOOKUP_TIMEOUT_MS = 8000;
+
 export async function lookupProduct(ean: string): Promise<ProductInfo | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
   try {
-    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`);
+    const encoded = encodeURIComponent(ean.trim());
+    const res = await fetch(
+      `https://world.openfoodfacts.org/api/v0/product/${encoded}.json`,
+      { signal: controller.signal },
+    );
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status !== 1) return null;
@@ -14,5 +22,7 @@ export async function lookupProduct(ean: string): Promise<ProductInfo | null> {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }

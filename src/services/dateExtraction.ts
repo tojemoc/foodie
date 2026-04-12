@@ -23,6 +23,10 @@ function isReasonableDate(d: Date): boolean {
   return d >= fiveYearsAgo && d <= tenYearsLater;
 }
 
+function roundTripValid(d: Date, expectedYear: number, expectedMonth: number, expectedDay: number): boolean {
+  return d.getFullYear() === expectedYear && d.getMonth() === expectedMonth && d.getDate() === expectedDay;
+}
+
 function nearKeyword(text: string, matchIndex: number): boolean {
   const keywords = ['EXP', 'BEST', 'BEFORE', 'USE BY', 'BB', 'VERBRAUCH', 'MHD', 'THT'];
   const window = text.substring(Math.max(0, matchIndex - 30), matchIndex + 5).toUpperCase();
@@ -42,19 +46,26 @@ function parseAllDates(cleaned: string): RawMatch[] {
     {
       name: 'YYYY-MM-DD',
       re: /\b(\d{4})-(\d{2})-(\d{2})\b/g,
-      parse: (m) => new Date(+m[1], +m[2] - 1, +m[3]),
+      parse: (m) => {
+        const d = new Date(+m[1], +m[2] - 1, +m[3]);
+        return roundTripValid(d, +m[1], +m[2] - 1, +m[3]) ? d : null;
+      },
     },
     {
       name: 'DD/MM/YYYY',
       re: /\b(\d{2})[./-](\d{2})[./-](\d{4})\b/g,
-      parse: (m) => new Date(+m[3], +m[2] - 1, +m[1]),
+      parse: (m) => {
+        const d = new Date(+m[3], +m[2] - 1, +m[1]);
+        return roundTripValid(d, +m[3], +m[2] - 1, +m[1]) ? d : null;
+      },
     },
     {
       name: 'DD/MM/YY',
       re: /\b(\d{2})[./-](\d{2})[./-](\d{2})\b/g,
       parse: (m) => {
         const yr = +m[3] + (+m[3] < 70 ? 2000 : 1900);
-        return new Date(yr, +m[2] - 1, +m[1]);
+        const d = new Date(yr, +m[2] - 1, +m[1]);
+        return roundTripValid(d, yr, +m[2] - 1, +m[1]) ? d : null;
       },
     },
     {
@@ -64,7 +75,9 @@ function parseAllDates(cleaned: string): RawMatch[] {
         const yr = +m[2] + (+m[2] < 70 ? 2000 : 1900);
         const month = +m[1] - 1;
         if (month < 0 || month > 11) return null;
-        return new Date(yr, month + 1, 0);
+        const d = new Date(yr, month + 1, 0);
+        if (d.getFullYear() !== yr || d.getMonth() !== month) return null;
+        return d;
       },
     },
     {
@@ -72,7 +85,9 @@ function parseAllDates(cleaned: string): RawMatch[] {
       re: /\b(\d{1,2})\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*(\d{2,4})\b/g,
       parse: (m) => {
         const yr = m[3].length === 2 ? +m[3] + 2000 : +m[3];
-        return new Date(yr, MONTHS[m[2]], +m[1]);
+        const mo = MONTHS[m[2]];
+        const d = new Date(yr, mo, +m[1]);
+        return roundTripValid(d, yr, mo, +m[1]) ? d : null;
       },
     },
     {
@@ -80,8 +95,14 @@ function parseAllDates(cleaned: string): RawMatch[] {
       re: /\b(\d{1,2})\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\b/g,
       parse: (m) => {
         const now = new Date();
-        let d = new Date(now.getFullYear(), MONTHS[m[2]], +m[1]);
-        if (d < now) d = new Date(now.getFullYear() + 1, MONTHS[m[2]], +m[1]);
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const mo = MONTHS[m[2]];
+        let d = new Date(now.getFullYear(), mo, +m[1]);
+        if (!roundTripValid(d, now.getFullYear(), mo, +m[1])) return null;
+        if (d < todayMidnight) {
+          d = new Date(now.getFullYear() + 1, mo, +m[1]);
+          if (!roundTripValid(d, now.getFullYear() + 1, mo, +m[1])) return null;
+        }
         return d;
       },
     },

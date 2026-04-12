@@ -7,9 +7,9 @@ export default function SettingsPage() {
   );
 
   async function handleEnableNotifications() {
-    const granted = await requestNotificationPermission();
-    setNotifStatus(granted ? 'granted' : 'denied');
-    if (granted) {
+    const permission = await requestNotificationPermission();
+    setNotifStatus(permission);
+    if (permission === 'granted') {
       await checkExpiringSoon();
     }
   }
@@ -17,7 +17,7 @@ export default function SettingsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>⚙️ Settings</h1>
+        <h1>Settings</h1>
       </div>
 
       <div className="card">
@@ -26,7 +26,7 @@ export default function SettingsPage() {
             <div style={{ fontWeight: 600 }}>Notifications</div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               {notifStatus === 'granted' && 'Enabled'}
-              {notifStatus === 'denied' && 'Denied — enable in browser settings'}
+              {notifStatus === 'denied' && 'Denied \u2014 enable in browser settings'}
               {notifStatus === 'default' && 'Not yet requested'}
               {notifStatus === 'unsupported' && 'Not supported in this browser'}
             </div>
@@ -41,7 +41,7 @@ export default function SettingsPage() {
         <div className="settings-item">
           <div>
             <div style={{ fontWeight: 600 }}>Version</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>0.1.0 — PoC</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>0.1.0 \u2014 PoC</div>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ textAlign: 'center', marginTop: 40, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-        Foodie — Grocery Checking/Management that is painless
+        Foodie \u2014 Grocery Checking/Management that is painless
       </div>
     </div>
   );

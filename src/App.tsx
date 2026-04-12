@@ -14,11 +14,16 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await seedDefaultLocations();
-      if ('Notification' in window && Notification.permission === 'granted') {
-        checkExpiringSoon();
+      try {
+        await seedDefaultLocations();
+        if ('Notification' in window && Notification.permission === 'granted') {
+          await checkExpiringSoon();
+        }
+      } catch (err) {
+        console.error('Startup initialization failed:', err);
+      } finally {
+        if (!cancelled) setReady(true);
       }
-      if (!cancelled) setReady(true);
     })();
     return () => { cancelled = true; };
   }, []);

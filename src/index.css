@@ -210,7 +210,7 @@ input, select, textarea {
 .fab {
   position: fixed;
   bottom: 76px;
-  right: calc(50% - 210px);
+  right: max(16px, calc(50% - 210px));
   width: 56px;
   height: 56px;
   border-radius: 50%;

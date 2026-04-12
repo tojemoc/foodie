@@ -34,7 +34,10 @@ export function seedDefaultLocations(): Promise<void> {
           { name: 'Counter', icon: '🍎' },
         ]);
       }
-    })();
+    })().catch((err) => {
+      seedPromise = null;
+      throw err;
+    });
   }
   return seedPromise;
 }
