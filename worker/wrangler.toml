@@ -1,0 +1,18 @@
+# Cloudflare Worker for Foodie (health/version endpoints; extend for future API).
+# Replace worker names with your Cloudflare account naming if needed.
+# Staging:  wrangler deploy --env staging
+# Production: wrangler deploy
+
+name = "foodie-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+VERSION = "local"
+
+# Staging — separate Worker name so production is never overwritten by main-branch deploys.
+[env.staging]
+name = "foodie-api-staging"
+
+[env.staging.vars]
+VERSION = "staging"
