@@ -18,11 +18,7 @@ export interface Env {
   MAGIC_LINK_TTL_SECONDS?: string;
   BREVO_API_KEY?: string;
   MAGIC_LINK_FROM_EMAIL?: string;
-  /**
-   * Backward-compatible fallback for existing deployments that already set
-   * Resend credentials. Prefer BREVO_API_KEY going forward.
-   */
-  RESEND_API_KEY?: string;
+  MAGIC_LINK_FROM_NAME?: string;
 }
 
 type StoredPasskey = {
@@ -384,45 +380,24 @@ async function startMagicLink(request: Request, env: Env): Promise<Response> {
 }
 
 async function maybeSendMagicEmail(env: Env, recipient: string, magicLink: string): Promise<boolean> {
-  if (!env.MAGIC_LINK_FROM_EMAIL) {
+  if (!env.BREVO_API_KEY || !env.MAGIC_LINK_FROM_EMAIL) {
     return false;
   }
 
-  if (env.BREVO_API_KEY) {
-    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { email: env.MAGIC_LINK_FROM_EMAIL, name: 'Foodie' },
-        to: [{ email: recipient }],
-        subject: 'Your Foodie magic sign-in link',
-        htmlContent: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
-      }),
-    });
-    return brevoRes.ok;
-  }
-
-  if (env.RESEND_API_KEY) {
-    const resendRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: env.MAGIC_LINK_FROM_EMAIL,
-        to: [recipient],
-        subject: 'Your Foodie magic sign-in link',
-        html: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
-      }),
-    });
-    return resendRes.ok;
-  }
-
-  return false;
+  const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': env.BREVO_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { email: env.MAGIC_LINK_FROM_EMAIL, name: env.MAGIC_LINK_FROM_NAME || 'Foodie' },
+      to: [{ email: recipient }],
+      subject: 'Your Foodie magic sign-in link',
+      htmlContent: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
+    }),
+  });
+  return brevoRes.ok;
 }
 
 async function verifyMagicLink(request: Request, env: Env): Promise<Response> {
