@@ -4,6 +4,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
   type AuthenticationResponseJSON,
+  type Base64URLString,
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 
@@ -476,7 +477,7 @@ async function passkeyRegistrationOptions(request: Request, env: Env): Promise<R
     rpName: 'Foodie',
     rpID: getRpId(request, env),
     userName: user.email,
-    userID: new TextEncoder().encode(user.id),
+    userID: stringToBuffer(user.id),
     userDisplayName: user.email,
     attestationType: 'none',
     authenticatorSelection: {
@@ -649,7 +650,7 @@ async function passkeyAuthenticationVerify(request: Request, env: Env): Promise<
     expectedRPID: getRpId(request, env),
     credential: {
       id: storedPasskey.id,
-      publicKey: base64UrlToBytes(storedPasskey.publicKey),
+      publicKey: base64UrlToBuffer(storedPasskey.publicKey),
       counter: storedPasskey.counter,
       transports: storedPasskey.transports as ('ble' | 'hybrid' | 'internal' | 'nfc' | 'smart-card' | 'usb' | 'cable')[] | undefined,
     },
@@ -728,22 +729,32 @@ function getRpId(request: Request, env: Env): string {
   return new URL(origin).hostname;
 }
 
-function base64UrlToBytes(input: string): Uint8Array {
+function stringToBuffer(input: string): Uint8Array<ArrayBuffer> {
+  const bytes = new TextEncoder().encode(input);
+  const buffer = new ArrayBuffer(bytes.length);
+  const out = new Uint8Array(buffer);
+  out.set(bytes);
+  return out;
+}
+
+function base64UrlToBuffer(input: string): Uint8Array<ArrayBuffer> {
   const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
   const padLength = (4 - (normalized.length % 4)) % 4;
   const padded = normalized + '='.repeat(padLength);
   const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
 }
 
-function bytesToBase64Url(bytes: Uint8Array): string {
+function bytesToBase64Url(bytes: Uint8Array<ArrayBufferLike>): Base64URLString {
   let binary = '';
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
+

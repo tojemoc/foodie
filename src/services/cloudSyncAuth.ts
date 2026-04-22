@@ -104,9 +104,9 @@ function deserializeLocations(locations: unknown[]): Location[] {
     .filter((loc) => loc.name);
 }
 
-export async function getCurrentUser(): Promise<ApiUser | null> {
+export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const res = await api<{ ok: boolean; user: ApiUser }>('/auth/me', { method: 'GET' });
+    const res = await api<{ ok: boolean; user: AuthUser }>('/auth/me', { method: 'GET' });
     return res.user;
   } catch {
     return null;
@@ -132,8 +132,8 @@ export async function startMagicLinkLogin(email: string): Promise<StartMagicLink
   });
 }
 
-export async function verifyMagicLinkToken(token: string): Promise<ApiUser> {
-  const res = await api<{ ok: boolean; user: ApiUser }>('/auth/magic-link/verify', {
+export async function verifyMagicLinkToken(token: string): Promise<AuthUser> {
+  const res = await api<{ ok: boolean; user: AuthUser }>('/auth/magic-link/verify', {
     method: 'POST',
     body: JSON.stringify({ token }),
   });
@@ -148,7 +148,9 @@ export async function registerPasskey(): Promise<number> {
     method: 'POST',
     body: JSON.stringify({}),
   });
-  const response = await startRegistration({ optionsJSON: options.options });
+  const response = await startRegistration({
+    optionsJSON: options.options as unknown as Parameters<typeof startRegistration>[0]['optionsJSON'],
+  });
   const verify = await api<{ ok: boolean; passkeyCount: number }>('/auth/passkey/register/verify', {
     method: 'POST',
     body: JSON.stringify({ response }),
@@ -156,7 +158,7 @@ export async function registerPasskey(): Promise<number> {
   return verify.passkeyCount;
 }
 
-export async function signInWithPasskey(email?: string): Promise<ApiUser> {
+export async function signInWithPasskey(email?: string): Promise<AuthUser> {
   if (!window.PublicKeyCredential) {
     throw new Error('Passkeys are not supported in this browser');
   }
@@ -164,8 +166,10 @@ export async function signInWithPasskey(email?: string): Promise<ApiUser> {
     method: 'POST',
     body: JSON.stringify(email ? { email } : {}),
   });
-  const response = await startAuthentication({ optionsJSON: options.options });
-  const verify = await api<{ ok: boolean; user: ApiUser }>('/auth/passkey/authenticate/verify', {
+  const response = await startAuthentication({
+    optionsJSON: options.options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'],
+  });
+  const verify = await api<{ ok: boolean; user: AuthUser }>('/auth/passkey/authenticate/verify', {
     method: 'POST',
     body: JSON.stringify({
       challenge: options.options.challenge,
