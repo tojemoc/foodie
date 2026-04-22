@@ -16,8 +16,13 @@ export interface Env {
   RP_ID?: string;
   SESSION_TTL_SECONDS?: string;
   MAGIC_LINK_TTL_SECONDS?: string;
-  RESEND_API_KEY?: string;
+  BREVO_API_KEY?: string;
   MAGIC_LINK_FROM_EMAIL?: string;
+  /**
+   * Backward-compatible fallback for existing deployments that already set
+   * Resend credentials. Prefer BREVO_API_KEY going forward.
+   */
+  RESEND_API_KEY?: string;
 }
 
 type StoredPasskey = {
@@ -67,8 +72,6 @@ const SESSION_COOKIE = 'foodie_session';
 const DEFAULT_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const DEFAULT_MAGIC_LINK_TTL_SECONDS = 60 * 15;
 const DEFAULT_CHALLENGE_TTL_SECONDS = 60 * 5;
-
-const MAGIC_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -351,7 +354,7 @@ async function startMagicLink(request: Request, env: Env): Promise<Response> {
   }
 
   const email = body.email?.trim().toLowerCase();
-  if (!email || !MAGIC_EMAIL_REGEX.test(email)) {
+  if (!email || !isValidEmailAddress(email)) {
     return errorJson('Valid email is required');
   }
 
@@ -381,24 +384,45 @@ async function startMagicLink(request: Request, env: Env): Promise<Response> {
 }
 
 async function maybeSendMagicEmail(env: Env, recipient: string, magicLink: string): Promise<boolean> {
-  if (!env.RESEND_API_KEY || !env.MAGIC_LINK_FROM_EMAIL) {
+  if (!env.MAGIC_LINK_FROM_EMAIL) {
     return false;
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.MAGIC_LINK_FROM_EMAIL,
-      to: [recipient],
-      subject: 'Your Foodie magic sign-in link',
-      html: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
-    }),
-  });
-  return res.ok;
+  if (env.BREVO_API_KEY) {
+    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: env.MAGIC_LINK_FROM_EMAIL, name: 'Foodie' },
+        to: [{ email: recipient }],
+        subject: 'Your Foodie magic sign-in link',
+        htmlContent: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
+      }),
+    });
+    return brevoRes.ok;
+  }
+
+  if (env.RESEND_API_KEY) {
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: env.MAGIC_LINK_FROM_EMAIL,
+        to: [recipient],
+        subject: 'Your Foodie magic sign-in link',
+        html: `<p>Tap to sign in to Foodie:</p><p><a href="${magicLink}">Sign in to Foodie</a></p><p>This link expires in 15 minutes.</p>`,
+      }),
+    });
+    return resendRes.ok;
+  }
+
+  return false;
 }
 
 async function verifyMagicLink(request: Request, env: Env): Promise<Response> {
@@ -765,5 +789,28 @@ function bytesToBase64Url(bytes: Uint8Array<ArrayBufferLike>): Base64URLString {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+/**
+ * ReDoS-safe email validation:
+ * - no complex regex backtracking on uncontrolled input
+ * - bounded checks on structure and allowed characters
+ */
+function isValidEmailAddress(value: string): boolean {
+  if (!value || value.length > 254) return false;
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@') || atIndex === value.length - 1) {
+    return false;
+  }
+
+  const local = value.slice(0, atIndex);
+  const domain = value.slice(atIndex + 1);
+  if (!local || !domain || local.length > 64) return false;
+  if (domain.startsWith('.') || domain.endsWith('.')) return false;
+  if (!domain.includes('.')) return false;
+
+  const validLocal = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local);
+  const validDomain = /^[A-Za-z0-9.-]+$/.test(domain) && !domain.includes('..');
+  return validLocal && validDomain;
 }
 

@@ -46,7 +46,9 @@ Configure the Worker with:
 - `FOODIE_KV` binding (KV namespace)
 - `WEBAPP_ORIGIN` (e.g. `https://foodie.example.com`)
 - `RP_ID` (e.g. `foodie.example.com`)
-- Optional magic-email delivery vars: `RESEND_API_KEY`, `MAGIC_LINK_FROM_EMAIL`
+- Optional magic-email delivery vars:
+  - Brevo (preferred/Cardex-aligned): `BREVO_API_KEY`, `MAGIC_LINK_FROM_EMAIL`
+  - Resend fallback: `RESEND_API_KEY`, `MAGIC_LINK_FROM_EMAIL`
 
 Set the frontend API base URL in `.env`:
 

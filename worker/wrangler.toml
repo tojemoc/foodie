@@ -13,6 +13,9 @@ WEBAPP_ORIGIN = "http://localhost:5173"
 RP_ID = "localhost"
 SESSION_TTL_SECONDS = "2592000"
 MAGIC_LINK_TTL_SECONDS = "900"
+# Optional for magic link delivery via Brevo
+# BREVO_API_KEY = "..."
+# MAGIC_LINK_FROM_EMAIL = "you@example.com"
 
 [[kv_namespaces]]
 binding = "FOODIE_KV"
@@ -29,6 +32,9 @@ WEBAPP_ORIGIN = "http://localhost:5173"
 RP_ID = "localhost"
 SESSION_TTL_SECONDS = "2592000"
 MAGIC_LINK_TTL_SECONDS = "900"
+# Optional for magic link delivery via Brevo
+# BREVO_API_KEY = "..."
+# MAGIC_LINK_FROM_EMAIL = "you@example.com"
 
 [[env.staging.kv_namespaces]]
 binding = "FOODIE_KV"
