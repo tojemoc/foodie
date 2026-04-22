@@ -33,6 +33,36 @@ The dev server starts at `http://localhost:5173`.
 
 Tests are not configured yet. The intended command is `npm test`.
 
+## Authentication + Cloudflare KV sync
+
+Foodie supports optional cloud auth and sync inspired by Cardex:
+
+- **Magic link auth** (`/auth/magic-link/start`, `/auth/magic-link/verify`)
+- **Passkey auth (WebAuthn)** (`/auth/passkey/*`)
+- **Per-user snapshot sync in KV** (`GET /sync`, `PUT /sync`)
+
+Configure the Worker with:
+
+- `FOODIE_KV` binding (KV namespace)
+- `WEBAPP_ORIGIN` (e.g. `https://foodie.example.com`)
+- `RP_ID` (e.g. `foodie.example.com`)
+- Optional magic-email delivery vars (Brevo): `BREVO_API_KEY`, `MAGIC_LINK_FROM_EMAIL`, `MAGIC_LINK_FROM_NAME`
+
+Set the frontend API base URL in `.env`:
+
+```bash
+VITE_API_BASE_URL=https://foodie-api.example.workers.dev
+```
+
+If `VITE_API_BASE_URL` is not set, Foodie keeps working local-only.
+
+### Data model (cloud-first)
+
+- **Primary storage:** Cloudflare KV snapshot per signed-in account (`/sync`).
+- **Offline cache:** IndexedDB stores a local mirror so the app still works offline.
+- **Sync behavior:** On login + app focus + tab visibility change, Foodie pulls cloud state; if no cloud snapshot exists yet, local state is pushed to initialize KV.
+- **Writes:** Item/location mutations save locally first, then best-effort push to KV (offline-safe).
+
 ## CI/CD (Cloudflare Pages + Worker)
 
 Workflows live under `.github/workflows/` (modeled after [cardex](https://github.com/tojemoc/cardex/tree/main/.github/workflows)):

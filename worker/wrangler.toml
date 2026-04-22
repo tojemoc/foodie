@@ -9,6 +9,18 @@ compatibility_date = "2024-11-01"
 
 [vars]
 VERSION = "local"
+WEBAPP_ORIGIN = "http://localhost:5173"
+RP_ID = "localhost"
+SESSION_TTL_SECONDS = "2592000"
+MAGIC_LINK_TTL_SECONDS = "900"
+# Optional for magic link delivery via Brevo
+# BREVO_API_KEY = "..."
+# MAGIC_LINK_FROM_EMAIL = "you@example.com"
+
+[[kv_namespaces]]
+binding = "FOODIE_KV"
+id = "replace-with-prod-kv-namespace-id"
+preview_id = "replace-with-preview-kv-namespace-id"
 
 # Staging — separate Worker name so production is never overwritten by main-branch deploys.
 [env.staging]
@@ -16,3 +28,15 @@ name = "foodie-api-staging"
 
 [env.staging.vars]
 VERSION = "staging"
+WEBAPP_ORIGIN = "http://localhost:5173"
+RP_ID = "localhost"
+SESSION_TTL_SECONDS = "2592000"
+MAGIC_LINK_TTL_SECONDS = "900"
+# Optional for magic link delivery via Brevo
+# BREVO_API_KEY = "..."
+# MAGIC_LINK_FROM_EMAIL = "you@example.com"
+
+[[env.staging.kv_namespaces]]
+binding = "FOODIE_KV"
+id = "replace-with-staging-kv-namespace-id"
+preview_id = "replace-with-staging-preview-kv-namespace-id"
