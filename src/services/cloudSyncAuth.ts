@@ -140,13 +140,13 @@ export async function verifyMagicLinkToken(token: string): Promise<AuthUser> {
   return res.user;
 }
 
-export async function registerPasskey(): Promise<number> {
+export async function registerPasskey(email?: string): Promise<number> {
   if (!window.PublicKeyCredential) {
     throw new Error('Passkeys are not supported in this browser');
   }
   const options = await api<PasskeyOptionsResponse>('/auth/passkey/register/options', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(email ? { email } : {}),
   });
   const response = await startRegistration({
     optionsJSON: options.options as unknown as Parameters<typeof startRegistration>[0]['optionsJSON'],
@@ -177,6 +177,15 @@ export async function signInWithPasskey(email?: string): Promise<AuthUser> {
     }),
   });
   return verify.user;
+}
+
+export async function createAccountWithPasskey(email: string): Promise<AuthUser> {
+  await registerPasskey(email);
+  const user = await getCurrentAuthUser();
+  if (!user) {
+    throw new Error('Passkey created but session was not established');
+  }
+  return user;
 }
 
 export async function logoutCloudSession(): Promise<void> {

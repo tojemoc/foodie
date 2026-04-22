@@ -463,14 +463,23 @@ async function logout(request: Request, env: Env): Promise<Response> {
 }
 
 async function passkeyRegistrationOptions(request: Request, env: Env): Promise<Response> {
-  const session = await requireSession(env, request);
-  if (!session) {
-    return errorJson('Not authenticated', 401);
+  let body: { email?: string } = {};
+  try {
+    body = await request.json();
+  } catch {
+    // Empty body is allowed for session-backed registration.
   }
 
-  const user = await getUserById(env, session.userId);
+  let user: StoredUser | null = null;
+  const session = await requireSession(env, request);
+  if (session) {
+    user = await getUserById(env, session.userId);
+  } else if (body.email) {
+    user = await getOrCreateUserByEmail(env, body.email);
+  }
+
   if (!user) {
-    return errorJson('User no longer exists', 404);
+    return errorJson('Provide email or sign in before registering a passkey', 401);
   }
 
   const options = await generateRegistrationOptions({
