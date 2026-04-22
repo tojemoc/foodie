@@ -470,6 +470,20 @@ input, select, textarea {
   border-bottom: none;
 }
 
+.settings-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.settings-auth-actions .btn {
+  width: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
 /* Summary stats */
 .stats-row {
   display: grid;

@@ -43,3 +43,29 @@ export function seedDefaultLocations(): Promise<void> {
 }
 
 export { db };
+
+type DbSnapshot = {
+  items: FoodItem[];
+  locations: Location[];
+};
+
+export async function exportDbSnapshot(): Promise<DbSnapshot> {
+  const [items, locations] = await Promise.all([
+    db.items.toArray(),
+    db.locations.toArray(),
+  ]);
+  return { items, locations };
+}
+
+export async function importDbSnapshot(snapshot: DbSnapshot): Promise<void> {
+  await db.transaction('rw', db.items, db.locations, async () => {
+    await db.items.clear();
+    await db.locations.clear();
+    if (snapshot.locations.length > 0) {
+      await db.locations.bulkAdd(snapshot.locations);
+    }
+    if (snapshot.items.length > 0) {
+      await db.items.bulkAdd(snapshot.items);
+    }
+  });
+}
