@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
+import { tryPushCloudSnapshotAfterMutation } from '../services/cloudSyncAuth';
 import type { FoodItem, Location } from '../types';
 import { getExpiryStatus } from '../types';
 import ItemCard from '../components/ItemCard';
@@ -36,6 +37,7 @@ export default function HomePage() {
   async function handleDelete(id: number) {
     try {
       await db.items.delete(id);
+      await tryPushCloudSnapshotAfterMutation();
       setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
       console.error('Failed to delete item:', err);

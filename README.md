@@ -56,6 +56,13 @@ VITE_API_BASE_URL=https://foodie-api.example.workers.dev
 
 If `VITE_API_BASE_URL` is not set, Foodie keeps working local-only.
 
+### Data model (cloud-first)
+
+- **Primary storage:** Cloudflare KV snapshot per signed-in account (`/sync`).
+- **Offline cache:** IndexedDB stores a local mirror so the app still works offline.
+- **Sync behavior:** On login + app focus + tab visibility change, Foodie pulls cloud state; if no cloud snapshot exists yet, local state is pushed to initialize KV.
+- **Writes:** Item/location mutations save locally first, then best-effort push to KV (offline-safe).
+
 ## CI/CD (Cloudflare Pages + Worker)
 
 Workflows live under `.github/workflows/` (modeled after [cardex](https://github.com/tojemoc/cardex/tree/main/.github/workflows)):

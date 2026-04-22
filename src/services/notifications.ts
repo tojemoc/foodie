@@ -1,5 +1,6 @@
 import { db } from './db';
 import { daysUntilExpiry } from '../types';
+import { saveLocalSnapshotToCloudBestEffort } from './cloudSyncAuth';
 
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!('Notification' in window)) return 'denied';
@@ -63,6 +64,7 @@ export async function checkExpiringSoon(): Promise<void> {
       });
 
       await db.items.update(item.id!, { lastNotified: { type, date: today } });
+      await saveLocalSnapshotToCloudBestEffort();
     } catch (err) {
       console.error(`Failed to process notification for item ${item.id}:`, err);
       continue;

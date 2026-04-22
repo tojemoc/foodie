@@ -250,3 +250,56 @@ export async function pullCloudSnapshotToLocal(): Promise<{ updatedAt: string; i
     locationCount: locations.length,
   };
 }
+
+let pushInFlight: Promise<{ synced: boolean; reason?: string }> | null = null;
+let pushQueued = false;
+
+async function pushLocalSnapshotToCloudIfPossible(): Promise<{ synced: boolean; reason?: string }> {
+  if (!isCloudSyncConfigured()) {
+    return { synced: false, reason: 'cloud-not-configured' };
+  }
+  if (!navigator.onLine) {
+    return { synced: false, reason: 'offline' };
+  }
+
+  const user = await getCurrentAuthUser();
+  if (!user) {
+    return { synced: false, reason: 'not-authenticated' };
+  }
+
+  await pushLocalSnapshotToCloud();
+  return { synced: true };
+}
+
+/**
+ * Coalesces bursty local mutations into sequenced KV writes.
+ * Local IndexedDB writes always complete first; this is best-effort background sync.
+ */
+export async function scheduleCloudSave(): Promise<{ synced: boolean; reason?: string }> {
+  if (pushInFlight) {
+    pushQueued = true;
+    return pushInFlight;
+  }
+
+  pushInFlight = (async () => {
+    const first = await pushLocalSnapshotToCloudIfPossible();
+    if (pushQueued) {
+      pushQueued = false;
+      return pushLocalSnapshotToCloudIfPossible();
+    }
+    return first;
+  })()
+    .finally(() => {
+      pushInFlight = null;
+    });
+
+  return pushInFlight;
+}
+
+export async function saveLocalSnapshotToCloudBestEffort(): Promise<{ synced: boolean; reason?: string }> {
+  return scheduleCloudSave();
+}
+
+export async function tryPushCloudSnapshotAfterMutation(): Promise<{ synced: boolean; reason?: string }> {
+  return scheduleCloudSave();
+}

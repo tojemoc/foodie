@@ -7,6 +7,7 @@ import { recognizeText } from '../services/ocr';
 import { extractDates } from '../services/dateExtraction';
 import { decodeBarcodeFromVideo } from '../services/barcodeScanner';
 import { lookupProduct } from '../services/productLookup';
+import { pushLocalSnapshotToCloud, isCloudSyncConfigured } from '../services/cloudSyncAuth';
 import type { Location, DateExtractionResult } from '../types';
 
 type Step = 'barcode' | 'product' | 'expiry-scan' | 'expiry-confirm' | 'location' | 'review';
@@ -224,6 +225,9 @@ export default function AddItemPage() {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      if (isCloudSyncConfigured()) {
+        await pushLocalSnapshotToCloud();
+      }
       navigate('/');
     } catch (err) {
       console.error('Failed to save item:', err);

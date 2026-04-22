@@ -85,7 +85,9 @@ export default function SettingsPage() {
         <div className="settings-item">
           <div>
             <div style={{ fontWeight: 600 }}>Data</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Stored locally in IndexedDB</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Primary storage in Cloudflare KV; IndexedDB is used for offline cache
+            </div>
           </div>
         </div>
       </div>

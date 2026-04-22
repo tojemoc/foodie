@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import type { Location, FoodItem } from '../types';
+import {
+  isCloudSyncConfigured,
+  pushLocalSnapshotToCloud,
+} from '../services/cloudSyncAuth';
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [items, setItems] = useState<FoodItem[]>([]);
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('📦');
+  const cloudConfigured = isCloudSyncConfigured();
 
   const loadData = async () => {
     try {
@@ -48,6 +53,11 @@ export default function LocationsPage() {
       await db.locations.add({ name: newName.trim(), icon: newIcon });
       setNewName('');
       setNewIcon('📦');
+      if (cloudConfigured) {
+        await pushLocalSnapshotToCloud().catch((err) => {
+          console.warn('Cloud sync skipped after add location (offline?)', err);
+        });
+      }
       await loadData();
     } catch (err) {
       console.error('Failed to add location:', err);
@@ -63,6 +73,11 @@ export default function LocationsPage() {
         return;
       }
       await db.locations.delete(id);
+      if (cloudConfigured) {
+        await pushLocalSnapshotToCloud().catch((err) => {
+          console.warn('Cloud sync skipped after delete location (offline?)', err);
+        });
+      }
       await loadData();
     } catch (err) {
       console.error('Failed to delete location:', err);
