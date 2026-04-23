@@ -38,5 +38,5 @@ MAGIC_LINK_TTL_SECONDS = "900"
 
 [[env.staging.kv_namespaces]]
 binding = "FOODIE_KV"
-id = "replace-with-staging-kv-namespace-id"
+id = "f14a4873b1144683b90317d75b6a79ab"
 preview_id = "replace-with-staging-preview-kv-namespace-id"
