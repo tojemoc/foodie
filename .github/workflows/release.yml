@@ -10,11 +10,11 @@
 #   VITE_API_BASE_URL_PRODUCTION         — Worker/API base URL for frontend build
 #   WORKER_WEBAPP_ORIGIN_PRODUCTION      — e.g. https://foodie.example.com
 #   WORKER_RP_ID_PRODUCTION              — e.g. foodie.example.com
-#   WORKER_SESSION_TTL_SECONDS           — e.g. 2592000
-#   WORKER_MAGIC_LINK_TTL_SECONDS        — e.g. 900
-#   WORKER_BREVO_API_KEY                 — optional (magic-link email delivery)
-#   WORKER_MAGIC_LINK_FROM_EMAIL         — optional (required if BREVO enabled)
-#   WORKER_MAGIC_LINK_FROM_NAME          — optional (default: Foodie)
+#   WORKER_SESSION_TTL_SECONDS_PRODUCTION     — e.g. 2592000
+#   WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION  — e.g. 900
+#   WORKER_BREVO_API_KEY_PRODUCTION           — optional (magic-link email delivery)
+#   WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION   — optional (required if BREVO enabled)
+#   WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION    — optional (default: Foodie)
 #
 # Checkout the tagged commit (`github.sha`) so production matches the tag, not the moving `main` tip.
 
@@ -57,25 +57,29 @@ jobs:
         env:
           WORKER_WEBAPP_ORIGIN: ${{ secrets.WORKER_WEBAPP_ORIGIN_PRODUCTION }}
           WORKER_RP_ID: ${{ secrets.WORKER_RP_ID_PRODUCTION }}
-          WORKER_SESSION_TTL_SECONDS: ${{ secrets.WORKER_SESSION_TTL_SECONDS }}
-          WORKER_MAGIC_LINK_TTL_SECONDS: ${{ secrets.WORKER_MAGIC_LINK_TTL_SECONDS }}
-          WORKER_BREVO_API_KEY: ${{ secrets.WORKER_BREVO_API_KEY }}
-          WORKER_MAGIC_LINK_FROM_EMAIL: ${{ secrets.WORKER_MAGIC_LINK_FROM_EMAIL }}
-          WORKER_MAGIC_LINK_FROM_NAME: ${{ secrets.WORKER_MAGIC_LINK_FROM_NAME }}
+          WORKER_SESSION_TTL_SECONDS: ${{ secrets.WORKER_SESSION_TTL_SECONDS_PRODUCTION }}
+          WORKER_MAGIC_LINK_TTL_SECONDS: ${{ secrets.WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION }}
+          WORKER_BREVO_API_KEY: ${{ secrets.WORKER_BREVO_API_KEY_PRODUCTION }}
+          WORKER_MAGIC_LINK_FROM_EMAIL: ${{ secrets.WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION }}
+          WORKER_MAGIC_LINK_FROM_NAME: ${{ secrets.WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: >-
-            deploy
-            --var VERSION:${{ github.ref_name }}
-            --var WEBAPP_ORIGIN:${{ env.WORKER_WEBAPP_ORIGIN }}
-            --var RP_ID:${{ env.WORKER_RP_ID }}
-            --var SESSION_TTL_SECONDS:${{ env.WORKER_SESSION_TTL_SECONDS }}
-            --var MAGIC_LINK_TTL_SECONDS:${{ env.WORKER_MAGIC_LINK_TTL_SECONDS }}
-            --var BREVO_API_KEY:${{ env.WORKER_BREVO_API_KEY }}
-            --var MAGIC_LINK_FROM_EMAIL:${{ env.WORKER_MAGIC_LINK_FROM_EMAIL }}
-            --var MAGIC_LINK_FROM_NAME:${{ env.WORKER_MAGIC_LINK_FROM_NAME }}
+          command: |
+            set -eu
+            if [ -n "${WORKER_BREVO_API_KEY}" ]; then
+              printf '%s' "${WORKER_BREVO_API_KEY}" | npx wrangler secret put BREVO_API_KEY
+            fi
+
+            CMD="deploy --var VERSION:${{ github.ref_name }} --var WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN} --var RP_ID:${WORKER_RP_ID} --var SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS} --var MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS}"
+            if [ -n "${WORKER_MAGIC_LINK_FROM_EMAIL}" ]; then
+              CMD="$CMD --var MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL}"
+            fi
+            if [ -n "${WORKER_MAGIC_LINK_FROM_NAME}" ]; then
+              CMD="$CMD --var MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME}"
+            fi
+            npx wrangler $CMD
 
   deploy-frontend-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404

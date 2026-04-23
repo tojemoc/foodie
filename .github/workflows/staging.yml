@@ -6,13 +6,13 @@
 #   CLOUDFLARE_ACCOUNT_ID
 #   CLOUDFLARE_PAGES_PROJECT_STAGING   — Pages project name (e.g. foodie-staging)
 #   VITE_API_BASE_URL_STAGING          — frontend API base URL for staging build
-#   WEBAPP_ORIGIN_STAGING              — allowed browser origin for Worker CORS/cookies
-#   RP_ID_STAGING                      — WebAuthn RP ID for staging
-#   SESSION_TTL_SECONDS_STAGING        — cookie/session TTL (e.g. 2592000)
-#   MAGIC_LINK_TTL_SECONDS_STAGING     — magic-link TTL (e.g. 900)
-#   BREVO_API_KEY_STAGING              — Brevo API key (optional)
-#   MAGIC_LINK_FROM_EMAIL_STAGING      — sender email for magic links (required if Brevo enabled)
-#   MAGIC_LINK_FROM_NAME_STAGING       — sender name for magic links (optional)
+#   WORKER_WEBAPP_ORIGIN_STAGING            — allowed browser origin for Worker CORS/cookies
+#   WORKER_RP_ID_STAGING                    — WebAuthn RP ID for staging
+#   WORKER_SESSION_TTL_SECONDS_STAGING      — cookie/session TTL (e.g. 2592000)
+#   WORKER_MAGIC_LINK_TTL_SECONDS_STAGING   — magic-link TTL (e.g. 900)
+#   WORKER_BREVO_API_KEY_STAGING            — Brevo API key (optional)
+#   WORKER_MAGIC_LINK_FROM_EMAIL_STAGING    — sender email for magic links (optional)
+#   WORKER_MAGIC_LINK_FROM_NAME_STAGING     — sender name for magic links (optional)
 #
 # Create the Pages project once in the Cloudflare dashboard (or via `wrangler pages project create`),
 # then set the secret to match the project name.
@@ -50,29 +50,41 @@ jobs:
 
       - name: Deploy Worker
         env:
-          WEBAPP_ORIGIN_STAGING: ${{ secrets.WEBAPP_ORIGIN_STAGING }}
-          RP_ID_STAGING: ${{ secrets.RP_ID_STAGING }}
-          SESSION_TTL_SECONDS_STAGING: ${{ secrets.SESSION_TTL_SECONDS_STAGING }}
-          MAGIC_LINK_TTL_SECONDS_STAGING: ${{ secrets.MAGIC_LINK_TTL_SECONDS_STAGING }}
-          BREVO_API_KEY_STAGING: ${{ secrets.BREVO_API_KEY_STAGING }}
-          MAGIC_LINK_FROM_EMAIL_STAGING: ${{ secrets.MAGIC_LINK_FROM_EMAIL_STAGING }}
-          MAGIC_LINK_FROM_NAME_STAGING: ${{ secrets.MAGIC_LINK_FROM_NAME_STAGING }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          wranglerVersion: latest
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          command: >-
-            deploy --env staging
-            --var VERSION:${{ github.sha }}
-            --var WEBAPP_ORIGIN:${{ env.WEBAPP_ORIGIN_STAGING }}
-            --var RP_ID:${{ env.RP_ID_STAGING }}
-            --var SESSION_TTL_SECONDS:${{ env.SESSION_TTL_SECONDS_STAGING }}
-            --var MAGIC_LINK_TTL_SECONDS:${{ env.MAGIC_LINK_TTL_SECONDS_STAGING }}
-            --var MAGIC_LINK_FROM_EMAIL:${{ env.MAGIC_LINK_FROM_EMAIL_STAGING }}
-            --var MAGIC_LINK_FROM_NAME:${{ env.MAGIC_LINK_FROM_NAME_STAGING }}
-            --var BREVO_API_KEY:${{ env.BREVO_API_KEY_STAGING }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WORKER_WEBAPP_ORIGIN_STAGING: ${{ secrets.WORKER_WEBAPP_ORIGIN_STAGING }}
+          WORKER_RP_ID_STAGING: ${{ secrets.WORKER_RP_ID_STAGING }}
+          WORKER_SESSION_TTL_SECONDS_STAGING: ${{ secrets.WORKER_SESSION_TTL_SECONDS_STAGING }}
+          WORKER_MAGIC_LINK_TTL_SECONDS_STAGING: ${{ secrets.WORKER_MAGIC_LINK_TTL_SECONDS_STAGING }}
+          WORKER_BREVO_API_KEY_STAGING: ${{ secrets.WORKER_BREVO_API_KEY_STAGING }}
+          WORKER_MAGIC_LINK_FROM_EMAIL_STAGING: ${{ secrets.WORKER_MAGIC_LINK_FROM_EMAIL_STAGING }}
+          WORKER_MAGIC_LINK_FROM_NAME_STAGING: ${{ secrets.WORKER_MAGIC_LINK_FROM_NAME_STAGING }}
+        working-directory: worker
+        run: |
+          set -euo pipefail
+
+          if [ -n "${WORKER_BREVO_API_KEY_STAGING:-}" ]; then
+            printf '%s' "$WORKER_BREVO_API_KEY_STAGING" | npx wrangler secret put BREVO_API_KEY --env staging
+          fi
+
+          DEPLOY_ARGS=(
+            deploy
+            --env staging
+            --var "VERSION:${GITHUB_SHA}"
+            --var "WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN_STAGING}"
+            --var "RP_ID:${WORKER_RP_ID_STAGING}"
+            --var "SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS_STAGING}"
+            --var "MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS_STAGING}"
+          )
+
+          if [ -n "${WORKER_MAGIC_LINK_FROM_EMAIL_STAGING:-}" ]; then
+            DEPLOY_ARGS+=(--var "MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL_STAGING}")
+          fi
+          if [ -n "${WORKER_MAGIC_LINK_FROM_NAME_STAGING:-}" ]; then
+            DEPLOY_ARGS+=(--var "MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME_STAGING}")
+          fi
+
+          npx wrangler "${DEPLOY_ARGS[@]}"
 
   deploy-frontend-staging:
     runs-on: blacksmith-4vcpu-ubuntu-2404

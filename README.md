@@ -54,7 +54,7 @@ Set the frontend API base URL in `.env`:
 VITE_API_BASE_URL=https://foodie-api.example.workers.dev
 ```
 
-If `VITE_API_BASE_URL` is not set, Foodie keeps working local-only.
+If `VITE_API_BASE_URL` is not set, cloud auth/sync is disabled and Foodie runs local-only.
 
 ### Data model (cloud-first)
 
@@ -86,7 +86,7 @@ Workflows live under `.github/workflows/` (modeled after [cardex](https://github
 
 ### CI/CD runtime var injection
 
-GitHub Actions now injects Worker runtime vars/secrets during deploy (staging + production), so local `wrangler.toml` defaults are no longer pushed to Cloudflare accidentally.
+GitHub Actions injects Worker runtime vars/secrets during deploy (staging + production), so local `wrangler.toml` defaults are not pushed to Cloudflare.
 
 Set these GitHub Actions secrets:
 
