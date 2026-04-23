@@ -29,9 +29,32 @@ permissions:
   contents: write
 
 jobs:
+  preflight-frontend-build:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: Preflight frontend build (production)
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
+
   deploy-worker-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Worker (production)
+    needs: preflight-frontend-build
     steps:
       - uses: actions/checkout@v6
         with:
@@ -68,23 +91,35 @@ jobs:
           workingDirectory: worker
           command: |
             set -eu
-            if [ -n "${WORKER_BREVO_API_KEY}" ]; then
-              printf '%s' "${WORKER_BREVO_API_KEY}" | npx wrangler secret put BREVO_API_KEY
-            fi
 
-            CMD="deploy --var VERSION:${{ github.ref_name }} --var WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN} --var RP_ID:${WORKER_RP_ID} --var SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS} --var MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS}"
+            ARGS=(
+              deploy
+              --var "VERSION:${{ github.ref_name }}"
+              --var "WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN}"
+              --var "RP_ID:${WORKER_RP_ID}"
+              --var "SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS}"
+              --var "MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS}"
+            )
             if [ -n "${WORKER_MAGIC_LINK_FROM_EMAIL}" ]; then
-              CMD="$CMD --var MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL}"
+              ARGS+=(--var "MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL}")
             fi
             if [ -n "${WORKER_MAGIC_LINK_FROM_NAME}" ]; then
-              CMD="$CMD --var MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME}"
+              ARGS+=(--var "MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME}")
             fi
-            npx wrangler $CMD
+
+            if [ -n "${WORKER_BREVO_API_KEY}" ]; then
+              printf 'BREVO_API_KEY=%s\n' "$WORKER_BREVO_API_KEY" > .secrets.production
+              ARGS+=(--secrets-file ".secrets.production")
+            fi
+
+            npx wrangler "${ARGS[@]}"
 
   deploy-frontend-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Pages (production)
-    needs: deploy-worker-production
+    needs:
+      - preflight-frontend-build
+      - deploy-worker-production
     steps:
       - uses: actions/checkout@v6
         with:
