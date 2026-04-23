@@ -54,7 +54,7 @@ Set the frontend API base URL in `.env`:
 VITE_API_BASE_URL=https://foodie-api.example.workers.dev
 ```
 
-If `VITE_API_BASE_URL` is not set, Foodie keeps working local-only.
+If `VITE_API_BASE_URL` is not set, cloud auth/sync is disabled and Foodie runs local-only.
 
 ### Data model (cloud-first)
 
@@ -79,8 +79,21 @@ Workflows live under `.github/workflows/` (modeled after [cardex](https://github
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID.
 - `CLOUDFLARE_PAGES_PROJECT_STAGING` — Staging Pages project name (create the project once in the dashboard).
 - `CLOUDFLARE_PAGES_PROJECT_PRODUCTION` — Production Pages project name.
+- `VITE_API_BASE_URL_STAGING` — Worker API base URL used during staging frontend build (e.g. `https://foodie-api-staging.<subdomain>.workers.dev`).
+- `VITE_API_BASE_URL_PRODUCTION` — Worker API base URL used during production frontend build (e.g. `https://foodie-api.<subdomain>.workers.dev`).
 
 **Worker** (`worker/`): minimal `GET /health` and `GET /version` for monitoring; extend later for APIs. Local: `cd worker && npm ci && npm run dev`.
+
+### CI/CD runtime var injection
+
+GitHub Actions injects Worker runtime vars/secrets during deploy (staging + production), so local `wrangler.toml` defaults are not pushed to Cloudflare.
+
+Set these GitHub Actions secrets:
+
+- `WORKER_WEBAPP_ORIGIN_STAGING`, `WORKER_RP_ID_STAGING`, `WORKER_SESSION_TTL_SECONDS_STAGING`, `WORKER_MAGIC_LINK_TTL_SECONDS_STAGING`
+- `WORKER_WEBAPP_ORIGIN_PRODUCTION`, `WORKER_RP_ID_PRODUCTION`, `WORKER_SESSION_TTL_SECONDS_PRODUCTION`, `WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION`
+- `WORKER_BREVO_API_KEY_STAGING`, `WORKER_MAGIC_LINK_FROM_EMAIL_STAGING`, `WORKER_MAGIC_LINK_FROM_NAME_STAGING` (optional)
+- `WORKER_BREVO_API_KEY_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION` (optional)
 
 ## Caveats
 

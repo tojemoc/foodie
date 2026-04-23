@@ -16,6 +16,7 @@ MAGIC_LINK_TTL_SECONDS = "900"
 # Optional for magic link delivery via Brevo
 # BREVO_API_KEY = "..."
 # MAGIC_LINK_FROM_EMAIL = "you@example.com"
+# MAGIC_LINK_FROM_NAME = "Foodie"
 
 [[kv_namespaces]]
 binding = "FOODIE_KV"
@@ -35,6 +36,7 @@ MAGIC_LINK_TTL_SECONDS = "900"
 # Optional for magic link delivery via Brevo
 # BREVO_API_KEY = "..."
 # MAGIC_LINK_FROM_EMAIL = "you@example.com"
+# MAGIC_LINK_FROM_NAME = "Foodie"
 
 [[env.staging.kv_namespaces]]
 binding = "FOODIE_KV"
