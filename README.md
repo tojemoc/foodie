@@ -79,6 +79,8 @@ Workflows live under `.github/workflows/` (modeled after [cardex](https://github
 - `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID.
 - `CLOUDFLARE_PAGES_PROJECT_STAGING` — Staging Pages project name (create the project once in the dashboard).
 - `CLOUDFLARE_PAGES_PROJECT_PRODUCTION` — Production Pages project name.
+- `VITE_API_BASE_URL_STAGING` — Worker API base URL used during staging frontend build (e.g. `https://foodie-api-staging.<subdomain>.workers.dev`).
+- `VITE_API_BASE_URL_PRODUCTION` — Worker API base URL used during production frontend build (e.g. `https://foodie-api.<subdomain>.workers.dev`).
 
 **Worker** (`worker/`): minimal `GET /health` and `GET /version` for monitoring; extend later for APIs. Local: `cd worker && npm ci && npm run dev`.
 
