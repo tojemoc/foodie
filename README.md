@@ -84,6 +84,17 @@ Workflows live under `.github/workflows/` (modeled after [cardex](https://github
 
 **Worker** (`worker/`): minimal `GET /health` and `GET /version` for monitoring; extend later for APIs. Local: `cd worker && npm ci && npm run dev`.
 
+### CI/CD runtime var injection
+
+GitHub Actions now injects Worker runtime vars/secrets during deploy (staging + production), so local `wrangler.toml` defaults are no longer pushed to Cloudflare accidentally.
+
+Set these GitHub Actions secrets:
+
+- `WORKER_WEBAPP_ORIGIN_STAGING`, `WORKER_RP_ID_STAGING`, `WORKER_SESSION_TTL_SECONDS_STAGING`, `WORKER_MAGIC_LINK_TTL_SECONDS_STAGING`
+- `WORKER_WEBAPP_ORIGIN_PRODUCTION`, `WORKER_RP_ID_PRODUCTION`, `WORKER_SESSION_TTL_SECONDS_PRODUCTION`, `WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION`
+- `WORKER_BREVO_API_KEY_STAGING`, `WORKER_MAGIC_LINK_FROM_EMAIL_STAGING`, `WORKER_MAGIC_LINK_FROM_NAME_STAGING` (optional)
+- `WORKER_BREVO_API_KEY_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION` (optional)
+
 ## Caveats
 
 - **Camera APIs**: `getUserMedia` is unavailable in headless/VM environments. The add-item flow provides "Skip — Enter manually" buttons as a fallback.

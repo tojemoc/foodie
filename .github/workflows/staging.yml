@@ -4,9 +4,15 @@
 # Required GitHub secrets:
 #   CLOUDFLARE_API_TOKEN
 #   CLOUDFLARE_ACCOUNT_ID
-#   CLOUDFLARE_PAGES_PROJECT_STAGING  — Pages project name (e.g. foodie-staging)
-#   VITE_API_BASE_URL_STAGING         — frontend API base URL for staging build
-#                                      (fallback: VITE_API_BASE_URL)
+#   CLOUDFLARE_PAGES_PROJECT_STAGING   — Pages project name (e.g. foodie-staging)
+#   VITE_API_BASE_URL_STAGING          — frontend API base URL for staging build
+#   WEBAPP_ORIGIN_STAGING              — allowed browser origin for Worker CORS/cookies
+#   RP_ID_STAGING                      — WebAuthn RP ID for staging
+#   SESSION_TTL_SECONDS_STAGING        — cookie/session TTL (e.g. 2592000)
+#   MAGIC_LINK_TTL_SECONDS_STAGING     — magic-link TTL (e.g. 900)
+#   BREVO_API_KEY_STAGING              — Brevo API key (optional)
+#   MAGIC_LINK_FROM_EMAIL_STAGING      — sender email for magic links (required if Brevo enabled)
+#   MAGIC_LINK_FROM_NAME_STAGING       — sender name for magic links (optional)
 #
 # Create the Pages project once in the Cloudflare dashboard (or via `wrangler pages project create`),
 # then set the secret to match the project name.
@@ -43,12 +49,29 @@ jobs:
         run: npm run typecheck
 
       - name: Deploy Worker
+        env:
+          WEBAPP_ORIGIN_STAGING: ${{ secrets.WEBAPP_ORIGIN_STAGING }}
+          RP_ID_STAGING: ${{ secrets.RP_ID_STAGING }}
+          SESSION_TTL_SECONDS_STAGING: ${{ secrets.SESSION_TTL_SECONDS_STAGING }}
+          MAGIC_LINK_TTL_SECONDS_STAGING: ${{ secrets.MAGIC_LINK_TTL_SECONDS_STAGING }}
+          BREVO_API_KEY_STAGING: ${{ secrets.BREVO_API_KEY_STAGING }}
+          MAGIC_LINK_FROM_EMAIL_STAGING: ${{ secrets.MAGIC_LINK_FROM_EMAIL_STAGING }}
+          MAGIC_LINK_FROM_NAME_STAGING: ${{ secrets.MAGIC_LINK_FROM_NAME_STAGING }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: deploy --env staging --var VERSION:${{ github.sha }}
+          command: >-
+            deploy --env staging
+            --var VERSION:${{ github.sha }}
+            --var WEBAPP_ORIGIN:${{ env.WEBAPP_ORIGIN_STAGING }}
+            --var RP_ID:${{ env.RP_ID_STAGING }}
+            --var SESSION_TTL_SECONDS:${{ env.SESSION_TTL_SECONDS_STAGING }}
+            --var MAGIC_LINK_TTL_SECONDS:${{ env.MAGIC_LINK_TTL_SECONDS_STAGING }}
+            --var MAGIC_LINK_FROM_EMAIL:${{ env.MAGIC_LINK_FROM_EMAIL_STAGING }}
+            --var MAGIC_LINK_FROM_NAME:${{ env.MAGIC_LINK_FROM_NAME_STAGING }}
+            --var BREVO_API_KEY:${{ env.BREVO_API_KEY_STAGING }}
 
   deploy-frontend-staging:
     runs-on: ubuntu-latest
@@ -67,7 +90,7 @@ jobs:
 
       - name: Build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_STAGING || secrets.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_STAGING }}
         run: npm run build
 
       - name: Deploy to Cloudflare Pages (staging)
