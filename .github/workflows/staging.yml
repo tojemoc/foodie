@@ -21,7 +21,7 @@ on:
 
 jobs:
   deploy-worker-staging:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Worker (staging)
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
           command: deploy --env staging --var VERSION:${{ github.sha }}
 
   deploy-frontend-staging:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Pages (staging)
     needs: deploy-worker-staging
     steps:
