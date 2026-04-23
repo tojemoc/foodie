@@ -29,12 +29,12 @@ on:
 
 jobs:
   deploy-worker-staging:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Worker (staging)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -59,6 +59,7 @@ jobs:
           MAGIC_LINK_FROM_NAME_STAGING: ${{ secrets.MAGIC_LINK_FROM_NAME_STAGING }}
         uses: cloudflare/wrangler-action@v3
         with:
+          wranglerVersion: latest
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
@@ -74,13 +75,13 @@ jobs:
             --var BREVO_API_KEY:${{ env.BREVO_API_KEY_STAGING }}
 
   deploy-frontend-staging:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Pages (staging)
     needs: deploy-worker-staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
