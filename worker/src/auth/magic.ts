@@ -28,7 +28,7 @@ export async function magicSend(request: Request, env: Env): Promise<Response> {
   const result = await sendBrevoEmail({
     apiKey:    env.BREVO_API_KEY,
     to:        email,
-    fromEmail: env.EMAIL_FROM      || 'noreply@foodie.app',
+    fromEmail: env.EMAIL_FROM      || 'foodie@tjm.sk',
     fromName:  env.EMAIL_FROM_NAME || 'Foodie',
     subject:   'Your Foodie sign-in link',
     html:      buildEmailHtml(magicUrl),
