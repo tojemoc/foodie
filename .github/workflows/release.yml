@@ -40,7 +40,8 @@ jobs:
           wranglerVersion: latest
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command:   pages deploy dist --project-name=foodie-prod --branch=main
+          workingDirectory: worker
+          command:   pages deploy ../dist --project-name=foodie-prod --branch=main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
