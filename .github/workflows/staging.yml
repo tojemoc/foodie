@@ -1,22 +1,3 @@
-# Deploy Worker + Cloudflare Pages from `main` (staging / preview stack).
-# Inspired by https://github.com/tojemoc/cardex/blob/main/.github/workflows/staging.yml
-#
-# Required GitHub secrets:
-#   CLOUDFLARE_API_TOKEN
-#   CLOUDFLARE_ACCOUNT_ID
-#   CLOUDFLARE_PAGES_PROJECT_STAGING   — Pages project name (e.g. foodie-staging)
-#   VITE_API_BASE_URL_STAGING          — frontend API base URL for staging build
-#   WORKER_WEBAPP_ORIGIN_STAGING            — allowed browser origin for Worker CORS/cookies
-#   WORKER_RP_ID_STAGING                    — WebAuthn RP ID for staging
-#   WORKER_SESSION_TTL_SECONDS_STAGING      — cookie/session TTL (e.g. 2592000)
-#   WORKER_MAGIC_LINK_TTL_SECONDS_STAGING   — magic-link TTL (e.g. 900)
-#   WORKER_BREVO_API_KEY_STAGING            — Brevo API key (optional)
-#   WORKER_MAGIC_LINK_FROM_EMAIL_STAGING    — sender email for magic links (optional)
-#   WORKER_MAGIC_LINK_FROM_NAME_STAGING     — sender name for magic links (optional)
-#
-# Create the Pages project once in the Cloudflare dashboard (or via `wrangler pages project create`),
-# then set the secret to match the project name.
-
 name: Deploy to Staging
 
 on:
@@ -32,83 +13,56 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Worker (staging)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: worker/package-lock.json
 
-      - name: Install worker dependencies
+      - name: Install worker deps
         working-directory: worker
         run: npm ci
 
-      - name: Typecheck worker
+      - name: Type-check worker
         working-directory: worker
-        run: npm run typecheck
+        run: npm run type-check
 
       - name: Deploy Worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          WORKER_WEBAPP_ORIGIN_STAGING: ${{ secrets.WORKER_WEBAPP_ORIGIN_STAGING }}
-          WORKER_RP_ID_STAGING: ${{ secrets.WORKER_RP_ID_STAGING }}
-          WORKER_SESSION_TTL_SECONDS_STAGING: ${{ secrets.WORKER_SESSION_TTL_SECONDS_STAGING }}
-          WORKER_MAGIC_LINK_TTL_SECONDS_STAGING: ${{ secrets.WORKER_MAGIC_LINK_TTL_SECONDS_STAGING }}
-          WORKER_BREVO_API_KEY_STAGING: ${{ secrets.WORKER_BREVO_API_KEY_STAGING }}
-          WORKER_MAGIC_LINK_FROM_EMAIL_STAGING: ${{ secrets.WORKER_MAGIC_LINK_FROM_EMAIL_STAGING }}
-          WORKER_MAGIC_LINK_FROM_NAME_STAGING: ${{ secrets.WORKER_MAGIC_LINK_FROM_NAME_STAGING }}
-        working-directory: worker
-        run: |
-          set -euo pipefail
-
-          if [ -n "${WORKER_BREVO_API_KEY_STAGING:-}" ]; then
-            printf '%s' "$WORKER_BREVO_API_KEY_STAGING" | npx wrangler secret put BREVO_API_KEY --env staging
-          fi
-
-          DEPLOY_ARGS=(
-            deploy
-            --env staging
-            --var "VERSION:${GITHUB_SHA}"
-            --var "WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN_STAGING}"
-            --var "RP_ID:${WORKER_RP_ID_STAGING}"
-            --var "SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS_STAGING}"
-            --var "MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS_STAGING}"
-          )
-
-          if [ -n "${WORKER_MAGIC_LINK_FROM_EMAIL_STAGING:-}" ]; then
-            DEPLOY_ARGS+=(--var "MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL_STAGING}")
-          fi
-          if [ -n "${WORKER_MAGIC_LINK_FROM_NAME_STAGING:-}" ]; then
-            DEPLOY_ARGS+=(--var "MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME_STAGING}")
-          fi
-
-          npx wrangler "${DEPLOY_ARGS[@]}"
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken:         ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId:        ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          # Deploys to a staging environment defined in wrangler.toml
+          command:          deploy --env staging
 
   deploy-frontend-staging:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Deploy Pages (staging)
+    name: Deploy Frontend (staging)
     needs: deploy-worker-staging
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install frontend deps
+        run: npm ci --legacy-peer-deps
 
-      - name: Build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_STAGING }}
+      - name: Type-check frontend
+        run: npm run type-check
+
+      - name: Build frontend
         run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL_STAGING }}
 
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: latest
+          apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT_STAGING }} --branch=main
+          # Deploys to the staging Pages project (separate from production)
+          command:   pages deploy dist --project-name=cardex-staging

@@ -1,111 +1,151 @@
-# Foodie
+# Cardex — Loyalty Wallet
 
-Grocery expiry tracking PWA with barcode scanning, OCR date extraction, and push notifications.
+A PWA loyalty card wallet with passkey (WebAuthn) + magic link auth and Cloudflare KV sync.
 
-## Quick Start
+```
+cardex/
+├── src/                  # Vite + TypeScript frontend
+│   ├── api.ts            # All Worker fetch calls
+│   ├── types.ts          # Shared types
+│   ├── main.ts           # App entry, event wiring
+│   ├── auth/
+│   │   ├── passkey.ts    # WebAuthn register / login
+│   │   ├── magic.ts      # Magic link send / verify
+│   │   └── session.ts    # JWT storage & restore
+│   ├── cards/
+│   │   ├── store.ts      # In-memory state + localStorage
+│   │   ├── sync.ts       # Push / pull against Worker
+│   │   └── merge.ts      # Merge strategy (remote-wins)
+│   ├── ui/
+│   │   ├── auth.ts       # Auth screen, panel switching
+│   │   ├── cards.ts      # Card grid, detail, add/edit
+│   │   ├── barcode.ts    # JsBarcode + QRCode rendering
+│   │   └── toast.ts      # Toast + sync indicator
+│   └── scanner/
+│       └── scanner.ts    # Camera scan stub (roadmap)
+├── worker/               # Cloudflare Worker (TypeScript)
+│   └── src/
+│       ├── index.ts      # Router
+│       ├── cards.ts      # GET/POST /cards
+│       ├── types.ts      # Env + KV value types
+│       ├── auth/
+│       │   ├── passkey.ts # WebAuthn ceremonies
+│       │   ├── magic.ts   # Magic link + Brevo email
+│       │   └── jwt.ts     # HS256 issue / verify
+│       └── lib/
+│           ├── cbor.ts    # Minimal CBOR decoder
+│           ├── cose.ts    # COSE sig verification
+│           ├── encoding.ts# base64url helpers
+│           ├── http.ts    # CORS + jsonResponse
+│           └── kv.ts      # Typed KV helpers
+├── public/               # Static assets + PWA icons
+├── index.html
+├── vite.config.ts
+├── tsconfig.json
+├── package.json
+└── deploy.yml            # → copy to .github/workflows/
+```
+
+---
+
+## Prerequisites
+
+- Node.js 20+
+- A [Cloudflare](https://cloudflare.com) account
+- A [Brevo](https://brevo.com) account (free tier is fine)
+
+---
+
+## 1 — Worker setup
 
 ```bash
+cd worker
 npm install
-npm run dev
+
+# Create the KV namespace
+wrangler kv:namespace create CARDEX_KV
+# Copy the returned id into worker/wrangler.toml → kv_namespaces[0].id
+
+# Edit wrangler.toml [vars] — set your Pages domain:
+#   FRONTEND_ORIGIN = "https://your-project.pages.dev"
+#   FRONTEND_RP_ID  = "your-project.pages.dev"
+#   EMAIL_FROM      = "noreply@yourdomain.com"
+#   EMAIL_FROM_NAME = "Cardex"
+
+# Set secrets (never committed)
+wrangler secret put JWT_SECRET      # paste any long random string
+wrangler secret put BREVO_API_KEY   # xkeysib-... from app.brevo.com
 ```
 
-The dev server starts at `http://localhost:5173`.
+---
 
-## Features
-
-- **Barcode scanning** — Scan EAN/UPC barcodes using `@zxing/library` and auto-lookup products via the Open Food Facts API.
-- **OCR date extraction** — Capture expiry dates from packaging using `tesseract.js` with an image-preprocessing pipeline (grayscale, contrast, binarization, upscaling).
-- **Date parsing engine** — Regex-based extraction supporting DD/MM/YYYY, YYYY-MM-DD, MM/YY, DD MMM YYYY and more, with heuristic confidence scoring.
-- **IndexedDB persistence** — Local-first storage via `Dexie.js` for items and storage locations.
-- **Expiry notifications** — On-open checks for items expiring in 3 days, 1 day, or already expired.
-- **Installable PWA** — Service worker via `vite-plugin-pwa` (Workbox) with offline caching and add-to-homescreen support.
-
-## Scripts
-
-| Command           | Description                          |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Start Vite dev server with HMR       |
-| `npm run build`   | TypeScript check + production build   |
-| `npm run lint`    | Run ESLint                            |
-| `npm run preview` | Preview production build              |
-
-## Testing
-
-Tests are not configured yet. The intended command is `npm test`.
-
-## Authentication + Cloudflare KV sync
-
-Foodie supports optional cloud auth and sync inspired by Cardex:
-
-- **Magic link auth** (`/auth/magic-link/start`, `/auth/magic-link/verify`)
-- **Passkey auth (WebAuthn)** (`/auth/passkey/*`)
-- **Per-user snapshot sync in KV** (`GET /sync`, `PUT /sync`)
-
-Configure the Worker with:
-
-- `FOODIE_KV` binding (KV namespace)
-- `WEBAPP_ORIGIN` (e.g. `https://foodie.example.com`)
-- `RP_ID` (e.g. `foodie.example.com`)
-- Optional magic-email delivery vars (Brevo): `BREVO_API_KEY`, `MAGIC_LINK_FROM_EMAIL`, `MAGIC_LINK_FROM_NAME`
-
-Set the frontend API base URL in `.env`:
+## 2 — Frontend setup
 
 ```bash
-VITE_API_BASE_URL=https://foodie-api.example.workers.dev
+# In the repo root
+npm install
+
+cp .env.example .env.local
+# Edit .env.local:
+#   VITE_API_URL=https://cardex-api.YOUR-SUBDOMAIN.workers.dev
 ```
 
-If `VITE_API_BASE_URL` is not set, cloud auth/sync is disabled and Foodie runs local-only.
+---
 
-### Data model (cloud-first)
+## 3 — Local development
 
-- **Primary storage:** Cloudflare KV snapshot per signed-in account (`/sync`).
-- **Offline cache:** IndexedDB stores a local mirror so the app still works offline.
-- **Sync behavior:** On login + app focus + tab visibility change, Foodie pulls cloud state; if no cloud snapshot exists yet, local state is pushed to initialize KV.
-- **Writes:** Item/location mutations save locally first, then best-effort push to KV (offline-safe).
+```bash
+# Terminal 1 — Worker
+cd worker && npm run dev    # http://localhost:8787
 
-## CI/CD (Cloudflare Pages + Worker)
+# Terminal 2 — Frontend
+npm run dev                 # http://localhost:5173
+```
 
-Workflows live under `.github/workflows/` (modeled after [cardex](https://github.com/tojemoc/cardex/tree/main/.github/workflows)):
+> Passkeys are domain-bound. For local dev, Chrome on localhost works fine.  
+> Make sure `VITE_API_URL=http://localhost:8787` in `.env.local`.
 
-| Workflow | When | What |
-| -------- | ---- | ---- |
-| **CI** | PRs and pushes to `main` | Lint + build the PWA; typecheck the Worker |
-| **Deploy to Staging** | Push to `main` (ignores `.github/**` and `*.md`) | Deploy Worker to `foodie-api-staging`, then `pages deploy` to the staging Pages project |
-| **Release to Production** | Tag push `v*` (e.g. `v0.1.0`) | Deploy Worker `foodie-api`, production Pages deploy, GitHub Release |
+---
 
-**GitHub secrets** (repository → Settings → Secrets):
+## 4 — Deploy
 
-- `CLOUDFLARE_API_TOKEN` — [API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/) with Workers deploy + Pages deploy (and Account read).
-- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID.
-- `CLOUDFLARE_PAGES_PROJECT_STAGING` — Staging Pages project name (create the project once in the dashboard).
-- `CLOUDFLARE_PAGES_PROJECT_PRODUCTION` — Production Pages project name.
-- `VITE_API_BASE_URL_STAGING` — Worker API base URL used during staging frontend build (e.g. `https://foodie-api-staging.<subdomain>.workers.dev`).
-- `VITE_API_BASE_URL_PRODUCTION` — Worker API base URL used during production frontend build (e.g. `https://foodie-api.<subdomain>.workers.dev`).
+```bash
+# Worker
+cd worker && npm run deploy
 
-**Worker** (`worker/`): minimal `GET /health` and `GET /version` for monitoring; extend later for APIs. Local: `cd worker && npm ci && npm run dev`.
+# Frontend
+npm run build
+wrangler pages deploy dist --project-name=your-project
+```
 
-### CI/CD runtime var injection
+Or push to `main` — GitHub Actions (`deploy.yml`) handles both automatically.
 
-GitHub Actions injects Worker runtime vars/secrets during deploy (staging + production), so local `wrangler.toml` defaults are not pushed to Cloudflare.
+### GitHub Actions secrets needed
 
-Set these GitHub Actions secrets:
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers + Pages permissions |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
+| `VITE_API_URL` | Your deployed Worker URL |
 
-- `WORKER_WEBAPP_ORIGIN_STAGING`, `WORKER_RP_ID_STAGING`, `WORKER_SESSION_TTL_SECONDS_STAGING`, `WORKER_MAGIC_LINK_TTL_SECONDS_STAGING`
-- `WORKER_WEBAPP_ORIGIN_PRODUCTION`, `WORKER_RP_ID_PRODUCTION`, `WORKER_SESSION_TTL_SECONDS_PRODUCTION`, `WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION`
-- `WORKER_BREVO_API_KEY_STAGING`, `WORKER_MAGIC_LINK_FROM_EMAIL_STAGING`, `WORKER_MAGIC_LINK_FROM_NAME_STAGING` (optional)
-- `WORKER_BREVO_API_KEY_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION`, `WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION` (optional)
+---
 
-## Caveats
+## Roadmap
 
-- **Camera APIs**: `getUserMedia` is unavailable in headless/VM environments. The add-item flow provides "Skip — Enter manually" buttons as a fallback.
-- **Notifications**: Browser notifications require user permission and may not display in headless Chrome, though scheduler logic still runs.
-- **Tesseract.js**: The first OCR call downloads English language data (~4 MB). Subsequent calls reuse the cached worker.
-- **Vite version**: Pinned to Vite 7.x for `vite-plugin-pwa` peer-dependency compatibility.
+- [x] **Camera barcode scanning** — `src/scanner/scanner.ts` is stubbed, ready for `BarcodeDetector` implementation
+- [x] **Family / shared sync** — update `src/cards/merge.ts` with `updatedAt` conflict resolution
+- [x] **PWA install prompt** — Vite PWA plugin already configured, just needs an install button wired in `main.ts`
+- [ ] **Multi-device passkey management** — list + revoke credentials via new Worker endpoints
 
-## Tech Stack
+---
 
-React 19 · TypeScript · Vite 7 · react-router-dom · Dexie.js · @zxing/library · tesseract.js · vite-plugin-pwa
+## KV key schema
 
-## License
-
-[GPL-2.0](LICENSE)
+| Key | Value |
+|---|---|
+| `user:{userId}` | `{ id, username, email, createdAt }` |
+| `cred:{credentialId}` | `{ userId, publicKeyCose, counter, transports }` |
+| `challenge:{token}` | `{ userId?, email?, type }` — TTL 5 min |
+| `magiclink:{token}` | `{ userId, email, expires }` — TTL 15 min |
+| `email:{email}` | `userId` |
+| `cards:{userId}` | `Card[]` |

@@ -1,150 +1,76 @@
-# Deploy Worker + Cloudflare Pages from a version tag (production).
-# Inspired by https://github.com/tojemoc/cardex/blob/main/.github/workflows/release.yml
-#
-# Tag example: git tag v0.1.0 && git push origin v0.1.0
-#
-# Required GitHub secrets:
-#   CLOUDFLARE_API_TOKEN
-#   CLOUDFLARE_ACCOUNT_ID
-#   CLOUDFLARE_PAGES_PROJECT_PRODUCTION  — Pages project name (e.g. foodie)
-#   VITE_API_BASE_URL_PRODUCTION         — Worker/API base URL for frontend build
-#   WORKER_WEBAPP_ORIGIN_PRODUCTION      — e.g. https://foodie.example.com
-#   WORKER_RP_ID_PRODUCTION              — e.g. foodie.example.com
-#   WORKER_SESSION_TTL_SECONDS_PRODUCTION     — e.g. 2592000
-#   WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION  — e.g. 900
-#   WORKER_BREVO_API_KEY_PRODUCTION           — optional (magic-link email delivery)
-#   WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION   — optional (required if BREVO enabled)
-#   WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION    — optional (default: Foodie)
-#
-# Checkout the tagged commit (`github.sha`) so production matches the tag, not the moving `main` tip.
-
 name: Release to Production
 
 on:
   push:
     tags:
-      - 'v*'
-
-permissions:
-  contents: write
+      - 'v*'   # triggers on v2.1.0, v2.2.0, etc.
 
 jobs:
-  preflight-frontend-build:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Preflight frontend build (production)
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: ${{ github.sha }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
-
   deploy-worker-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     name: Deploy Worker (production)
-    needs: preflight-frontend-build
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
+          # Fetch full history so we can resolve which branch the tag is on
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          # Check out main explicitly — tag pushes otherwise leave the
+          # repo in detached HEAD, which Cloudflare Pages sees as "HEAD"
+          # instead of "main" and fails the production branch check.
+          ref: main
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: worker/package-lock.json
 
-      - name: Install worker dependencies
+      - name: Install worker deps
         working-directory: worker
         run: npm ci
 
-      - name: Typecheck worker
+      - name: Type-check worker
         working-directory: worker
-        run: npm run typecheck
+        run: npm run type-check
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
-        env:
-          WORKER_WEBAPP_ORIGIN: ${{ secrets.WORKER_WEBAPP_ORIGIN_PRODUCTION }}
-          WORKER_RP_ID: ${{ secrets.WORKER_RP_ID_PRODUCTION }}
-          WORKER_SESSION_TTL_SECONDS: ${{ secrets.WORKER_SESSION_TTL_SECONDS_PRODUCTION }}
-          WORKER_MAGIC_LINK_TTL_SECONDS: ${{ secrets.WORKER_MAGIC_LINK_TTL_SECONDS_PRODUCTION }}
-          WORKER_BREVO_API_KEY: ${{ secrets.WORKER_BREVO_API_KEY_PRODUCTION }}
-          WORKER_MAGIC_LINK_FROM_EMAIL: ${{ secrets.WORKER_MAGIC_LINK_FROM_EMAIL_PRODUCTION }}
-          WORKER_MAGIC_LINK_FROM_NAME: ${{ secrets.WORKER_MAGIC_LINK_FROM_NAME_PRODUCTION }}
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken:         ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId:        ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: |
-            set -eu
-
-            ARGS=(
-              deploy
-              --var "VERSION:${{ github.ref_name }}"
-              --var "WEBAPP_ORIGIN:${WORKER_WEBAPP_ORIGIN}"
-              --var "RP_ID:${WORKER_RP_ID}"
-              --var "SESSION_TTL_SECONDS:${WORKER_SESSION_TTL_SECONDS}"
-              --var "MAGIC_LINK_TTL_SECONDS:${WORKER_MAGIC_LINK_TTL_SECONDS}"
-            )
-            if [ -n "${WORKER_MAGIC_LINK_FROM_EMAIL}" ]; then
-              ARGS+=(--var "MAGIC_LINK_FROM_EMAIL:${WORKER_MAGIC_LINK_FROM_EMAIL}")
-            fi
-            if [ -n "${WORKER_MAGIC_LINK_FROM_NAME}" ]; then
-              ARGS+=(--var "MAGIC_LINK_FROM_NAME:${WORKER_MAGIC_LINK_FROM_NAME}")
-            fi
-
-            if [ -n "${WORKER_BREVO_API_KEY}" ]; then
-              printf 'BREVO_API_KEY=%s\n' "$WORKER_BREVO_API_KEY" > .secrets.production
-              ARGS+=(--secrets-file ".secrets.production")
-            fi
-
-            npx wrangler "${ARGS[@]}"
+          command:          deploy   # default env = production
 
   deploy-frontend-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Deploy Pages (production)
-    needs:
-      - preflight-frontend-build
-      - deploy-worker-production
+    name: Deploy Frontend (production)
+    needs: deploy-worker-production
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.sha }}
+          ref: main
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install frontend deps
+        run: npm ci --legacy-peer-deps
 
-      - name: Build
+      - name: Type-check frontend
+        run: npm run type-check
+
+      - name: Build frontend
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Deploy to Cloudflare Pages (production)
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: latest
+          apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PAGES_PROJECT_PRODUCTION }} --branch=main
+          command:   pages deploy dist --project-name=vibecoded-stocard --branch=main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

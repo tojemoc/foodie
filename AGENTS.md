@@ -1,38 +1,42 @@
-# Agents
+# Cardex — Loyalty Wallet
 
-## Cursor Cloud-specific instructions
+PWA loyalty card wallet with passkey/magic-link auth and Cloudflare KV sync. Two packages: Vite frontend (root) and Cloudflare Worker API (`worker/`).
 
-This repository is a **Foodie** PWA — a grocery expiry tracker built with Vite + React + TypeScript.
+## Cursor Cloud specific instructions
 
-### Tech stack
+### Project structure
+- **Frontend** (root): Vanilla TypeScript + Vite 8, PWA via `vite-plugin-pwa`. Dev server: `npm run dev` → `http://localhost:5173`
+- **Worker API** (`worker/`): Cloudflare Worker + Wrangler 4. Dev server: `cd worker && npm run dev` → `http://localhost:8787` (local KV emulated by Miniflare). Note: existing `wrangler.toml` and dev/deploy scripts are v4-compatible and require no changes.
 
-- **Frontend**: React 19, TypeScript, Vite 7, react-router-dom v7
-- **PWA**: vite-plugin-pwa (Workbox)
-- **Storage**: IndexedDB via Dexie.js
-- **Scanning**: @zxing/library (barcode), Tesseract.js (OCR)
-- **External API**: Open Food Facts (product lookup by EAN)
+### Local environment files (not committed)
+- `.env.local` at root — must contain `VITE_API_URL=http://localhost:8787`
+- `worker/.dev.vars` — must contain `JWT_SECRET=<any-random-string>` (and optionally `BREVO_API_KEY` for magic-link email flow)
 
-### Running the dev server
+### Running dev servers
+Start both servers — order doesn't matter:
+```
+# Terminal 1 — Worker API
+cd worker && npm run dev
 
-```bash
+# Terminal 2 — Frontend
 npm run dev
 ```
+The worker uses `wrangler dev` which emulates KV locally in `.wrangler/` — no Cloudflare account needed for local dev.
 
-Serves on `http://localhost:5173` (binds to `0.0.0.0`).
+### Lint / type-check
+- Frontend: `npm run type-check` — note: there is a pre-existing TS error in `vite.config.ts` (`manualChunks` object form vs Rolldown's function expectation). This does not block `npm run dev`.
+- Worker: `cd worker && npm run type-check` — clean pass.
+- No ESLint or Prettier configured in this repo.
 
-### Key commands
+### Build
+- `npm run build` (`tsc && vite build`) — currently fails due to the same Vite 8 / Rolldown `manualChunks` issue described above. The dev server is unaffected.
 
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Start Vite dev server with HMR |
-| `npm run build` | TypeScript check + production build |
-| `npm run lint` | ESLint check |
-| `npm run preview` | Preview production build |
-| `npm test` | Tests not configured yet |
+### CORS for local dev
+The worker reads `Origin` header and reflects it in CORS responses. `http://localhost:5173` works automatically with `wrangler dev`.
 
-### Caveats for Cloud VMs
+### Dependencies
+- `npm install --legacy-peer-deps` is required at root due to `vite-plugin-pwa@1.x` peer-dep not covering `vite@8`.
+- `npm install` in `worker/` works without flags.
 
-- **Camera APIs**: `getUserMedia` is not available in headless environments. The "Add Item" flow offers a "Skip — Enter manually" button at both barcode and expiry-scan steps, so manual testing works fine without a camera.
-- **Notifications**: Browser notifications require user permission. In headless Chrome they may not display, but the scheduler logic still executes correctly.
-- **Tesseract.js**: First OCR call downloads language data (~4 MB). Subsequent calls reuse the cached worker.
-- **Vite version**: Pinned to Vite 7.x so all peer dependencies (including `vite-plugin-pwa`) resolve cleanly without `--legacy-peer-deps`.
+### Passkey auth on localhost
+Chrome allows WebAuthn on `localhost` without HTTPS. The worker's `FRONTEND_RP_ID` in `wrangler.toml` points to production; passkey registration will fail locally with an RP ID mismatch. Card management (add/edit/delete) works fully in offline/localStorage mode without authentication.

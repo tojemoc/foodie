@@ -1,44 +1,41 @@
-# Cloudflare Worker for Foodie (health/version endpoints; extend for future API).
-# Replace worker names with your Cloudflare account naming if needed.
-# Staging:  wrangler deploy --env staging
-# Production: wrangler deploy
+name                  = "cardex-api"
+main                  = "src/index.ts"
+compatibility_date    = "2024-01-01"
+compatibility_flags   = ["nodejs_compat"]
 
-name = "foodie-api"
-main = "src/index.ts"
-compatibility_date = "2024-11-01"
-
-[vars]
-VERSION = "local"
-WEBAPP_ORIGIN = "http://localhost:5173"
-RP_ID = "localhost"
-SESSION_TTL_SECONDS = "2592000"
-MAGIC_LINK_TTL_SECONDS = "900"
-# Optional for magic link delivery via Brevo
-# BREVO_API_KEY = "..."
-# MAGIC_LINK_FROM_EMAIL = "you@example.com"
-# MAGIC_LINK_FROM_NAME = "Foodie"
-
+# ── Production KV ─────────────────────────────────────────────
 [[kv_namespaces]]
-binding = "FOODIE_KV"
-id = "replace-with-prod-kv-namespace-id"
-preview_id = "replace-with-preview-kv-namespace-id"
+binding = "CARDEX_KV"
+id      = "c10dfc1b686d4d95a207bc18f5f96573"
 
-# Staging — separate Worker name so production is never overwritten by main-branch deploys.
+# ── Production vars ────────────────────────────────────────────
+[vars]
+FRONTEND_ORIGIN  = "https://cardex.tjm.sk"
+FRONTEND_RP_ID   = "cardex.tjm.sk"
+EMAIL_FROM       = "cardex@tjm.sk"
+EMAIL_FROM_NAME  = "Cardex Team"
+
+# Secrets — set via CLI, never commit values:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put BREVO_API_KEY
+
+# ── Staging environment ────────────────────────────────────────
+# Deploy with: wrangler deploy --env staging
+# Secrets:     wrangler secret put JWT_SECRET --env staging
+#              wrangler secret put BREVO_API_KEY --env staging
 [env.staging]
-name = "foodie-api-staging"
-
-[env.staging.vars]
-VERSION = "staging"
-WEBAPP_ORIGIN = "http://localhost:5173"
-RP_ID = "localhost"
-SESSION_TTL_SECONDS = "2592000"
-MAGIC_LINK_TTL_SECONDS = "900"
-# Optional for magic link delivery via Brevo
-# BREVO_API_KEY = "..."
-# MAGIC_LINK_FROM_EMAIL = "you@example.com"
-# MAGIC_LINK_FROM_NAME = "Foodie"
+name = "cardex-api-staging"
 
 [[env.staging.kv_namespaces]]
-binding = "FOODIE_KV"
-id = "f14a4873b1144683b90317d75b6a79ab"
-preview_id = "replace-with-staging-preview-kv-namespace-id"
+binding = "CARDEX_KV"
+id      = "29f06f6ce72b4c61b0223da13dda1346"
+
+[env.staging.vars]
+FRONTEND_ORIGIN  = "https://cardex-staging.pages.dev"
+FRONTEND_RP_ID   = "cardex-staging.pages.dev"
+EMAIL_FROM       = "cardex@tjm.sk"
+EMAIL_FROM_NAME  = "Cardex Staging"
+
+# ── Local dev ──────────────────────────────────────────────────
+[dev]
+port = 8787
