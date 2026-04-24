@@ -13,9 +13,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name:             'Cardex — Loyalty Wallet',
-        short_name:       'Cardex',
-        description:      'Store and access your loyalty cards offline',
+        name:             'Foodie — Food & Grocery Tracker',
+        short_name:       'Foodie',
+        description:      'Store and track your food and groceries offline',
         theme_color:      '#0a0a0f',
         background_color: '#0a0a0f',
         display:          'standalone',

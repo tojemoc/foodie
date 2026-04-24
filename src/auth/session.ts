@@ -1,7 +1,7 @@
 import type { Session }  from '../types.js';
 import { setToken }      from '../api.js';
 
-const SESSION_KEY = 'cardex_v2_session';
+const SESSION_KEY = 'foodie_v2_session';
 
 let _session: Session | null = null;
 

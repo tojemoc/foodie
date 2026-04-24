@@ -6,9 +6,9 @@ on:
       - 'v*'   # triggers on v2.1.0, v2.2.0, etc.
 
 jobs:
-  deploy-worker-production:
+  deploy-frontend-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Deploy Worker (production)
+    name: Deploy Frontend (production)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,36 +17,6 @@ jobs:
           # Check out main explicitly — tag pushes otherwise leave the
           # repo in detached HEAD, which Cloudflare Pages sees as "HEAD"
           # instead of "main" and fails the production branch check.
-          ref: main
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install worker deps
-        working-directory: worker
-        run: npm ci
-
-      - name: Type-check worker
-        working-directory: worker
-        run: npm run type-check
-
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken:         ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId:        ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          command:          deploy   # default env = production
-
-  deploy-frontend-production:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Deploy Frontend (production)
-    needs: deploy-worker-production
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
           ref: main
 
       - uses: actions/setup-node@v4
@@ -70,7 +40,7 @@ jobs:
           wranglerVersion: latest
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command:   pages deploy dist --project-name=vibecoded-stocard --branch=main
+          command:   pages deploy dist --project-name=foodie-prod --branch=main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

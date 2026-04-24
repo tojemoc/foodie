@@ -1,7 +1,7 @@
 {
-  "name":             "Cardex — Loyalty Wallet",
-  "short_name":       "Cardex",
-  "description":      "Store and access your loyalty cards, anywhere.",
+  "name":             "Foodie — Food & Grocery Tracker",
+  "short_name":       "Foodie",
+  "description":      "Store and track your food and groceries, anywhere.",
   "theme_color":      "#0a0a0f",
   "background_color": "#0a0a0f",
   "display":          "standalone",

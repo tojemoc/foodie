@@ -1,19 +1,19 @@
-name                  = "cardex-api"
+name                  = "foodie-api"
 main                  = "src/index.ts"
 compatibility_date    = "2024-01-01"
 compatibility_flags   = ["nodejs_compat"]
 
 # ── Production KV ─────────────────────────────────────────────
 [[kv_namespaces]]
-binding = "CARDEX_KV"
+binding = "FOODIE_KV"
 id      = "c10dfc1b686d4d95a207bc18f5f96573"
 
 # ── Production vars ────────────────────────────────────────────
 [vars]
-FRONTEND_ORIGIN  = "https://cardex.tjm.sk"
-FRONTEND_RP_ID   = "cardex.tjm.sk"
-EMAIL_FROM       = "cardex@tjm.sk"
-EMAIL_FROM_NAME  = "Cardex Team"
+FRONTEND_ORIGIN  = "https://foodie-prod.pages.dev"
+FRONTEND_RP_ID   = "foodie-prod.pages.dev"
+EMAIL_FROM       = "foodie@tjm.sk"
+EMAIL_FROM_NAME  = "Foodie Team"
 
 # Secrets — set via CLI, never commit values:
 #   wrangler secret put JWT_SECRET
@@ -24,17 +24,17 @@ EMAIL_FROM_NAME  = "Cardex Team"
 # Secrets:     wrangler secret put JWT_SECRET --env staging
 #              wrangler secret put BREVO_API_KEY --env staging
 [env.staging]
-name = "cardex-api-staging"
+name = "foodie-api-staging"
 
 [[env.staging.kv_namespaces]]
-binding = "CARDEX_KV"
-id      = "29f06f6ce72b4c61b0223da13dda1346"
+binding = "FOODIE_KV"
+id      = "f14a4873b1144683b90317d75b6a79ab"
 
 [env.staging.vars]
-FRONTEND_ORIGIN  = "https://cardex-staging.pages.dev"
-FRONTEND_RP_ID   = "cardex-staging.pages.dev"
-EMAIL_FROM       = "cardex@tjm.sk"
-EMAIL_FROM_NAME  = "Cardex Staging"
+FRONTEND_ORIGIN  = "https://foodie-staging.pages.dev"
+FRONTEND_RP_ID   = "foodie-staging.pages.dev"
+EMAIL_FROM       = "foodie@tjm.sk"
+EMAIL_FROM_NAME  = "Foodie Staging"
 
 # ── Local dev ──────────────────────────────────────────────────
 [dev]
