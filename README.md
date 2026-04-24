@@ -1,9 +1,9 @@
-# Cardex — Loyalty Wallet
+# Foodie — Food & Grocery Tracker
 
-A PWA loyalty card wallet with passkey (WebAuthn) + magic link auth and Cloudflare KV sync.
+A PWA food or grocery item wallet with passkey (WebAuthn) + magic link auth and Cloudflare KV sync.
 
 ```
-cardex/
+foodie/
 ├── src/                  # Vite + TypeScript frontend
 │   ├── api.ts            # All Worker fetch calls
 │   ├── types.ts          # Shared types
@@ -63,14 +63,14 @@ cd worker
 npm install
 
 # Create the KV namespace
-wrangler kv:namespace create CARDEX_KV
+wrangler kv:namespace create FOODIE_KV
 # Copy the returned id into worker/wrangler.toml → kv_namespaces[0].id
 
 # Edit wrangler.toml [vars] — set your Pages domain:
 #   FRONTEND_ORIGIN = "https://your-project.pages.dev"
 #   FRONTEND_RP_ID  = "your-project.pages.dev"
 #   EMAIL_FROM      = "noreply@yourdomain.com"
-#   EMAIL_FROM_NAME = "Cardex"
+#   EMAIL_FROM_NAME = "Foodie"
 
 # Set secrets (never committed)
 wrangler secret put JWT_SECRET      # paste any long random string
@@ -87,7 +87,7 @@ npm install
 
 cp .env.example .env.local
 # Edit .env.local:
-#   VITE_API_URL=https://cardex-api.YOUR-SUBDOMAIN.workers.dev
+#   VITE_API_URL=https://foodie-api.YOUR-SUBDOMAIN.workers.dev
 ```
 
 ---

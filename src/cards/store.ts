@@ -1,7 +1,7 @@
 import type { Card, Tombstone } from '../types.js';
 
-const STORE_KEY      = 'cardex_v2_cards';
-const TOMBSTONE_KEY  = 'cardex_v2_tombstones';
+const STORE_KEY      = 'foodie_v2_cards';
+const TOMBSTONE_KEY  = 'foodie_v2_tombstones';
 
 // Tombstones older than 30 days are pruned — enough time for any device to sync.
 const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;

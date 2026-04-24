@@ -50,7 +50,7 @@ export interface Tombstone {
 // ── Worker env bindings ───────────────────────────────────────────────────────
 
 export interface Env {
-  CARDEX_KV:       KVNamespace;
+  FOODIE_KV:       KVNamespace;
   JWT_SECRET:      string;
   BREVO_API_KEY:   string;
   FRONTEND_ORIGIN: string;

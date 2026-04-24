@@ -44,7 +44,7 @@ export function renderCards(): void {
     c.name.toLowerCase().includes(query) || c.number.toLowerCase().includes(query)
   );
 
-  if (count) count.textContent = `${filtered.length} card${filtered.length !== 1 ? 's' : ''}`;
+  if (count) count.textContent = `${filtered.length} item${filtered.length !== 1 ? 's' : ''}`;
 
   if (!filtered.length) {
     const allEmpty = getCards().length === 0;
@@ -54,8 +54,8 @@ export function renderCards(): void {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/>
           </svg>
-          <h3>${allEmpty ? 'No cards yet' : 'No matches'}</h3>
-          <p>${allEmpty ? 'Tap + to add your first loyalty card.' : 'Try a different search or category.'}</p>
+          <h3>${allEmpty ? 'No items yet' : 'No matches'}</h3>
+          <p>${allEmpty ? 'Tap + to add your first food or grocery item.' : 'Try a different search or category.'}</p>
         </div>
       </div>`;
     return;
@@ -152,7 +152,7 @@ function renderDetailBarcode(card: Card): void {
 
 export function openAddSheet(prefill?: Card): void {
   editMode = !!prefill;
-  setText('add-sheet-title', editMode ? 'Edit Card' : 'Add Card');
+  setText('add-sheet-title', editMode ? 'Edit Item' : 'Add Item');
 
   setValue('f-name',     prefill?.name     ?? '');
   setValue('f-number',   prefill?.number   ?? '');
@@ -167,7 +167,7 @@ export function openAddSheet(prefill?: Card): void {
   buildColorPicker();
 
   const preview = document.getElementById('form-barcode-preview');
-  if (preview) preview.innerHTML = '<p class="preview-error">Enter a card number above</p>';
+  if (preview) preview.innerHTML = '<p class="preview-error">Enter an item number above</p>';
   if (prefill?.number) setTimeout(updateFormPreview, 50);
 
   // Inject scan button next to the number field (only if not already there)
@@ -266,17 +266,17 @@ export async function saveCard(): Promise<void> {
   const notes    = getVal('f-notes');
 
   if (!name)   { showToast('Please enter a store name'); return; }
-  if (!number) { showToast('Please enter a card number'); return; }
+  if (!number) { showToast('Please enter an item number'); return; }
 
   if (editMode && currentCardId) {
     const existing = getCards().find(c => c.id === currentCardId);
     if (existing) {
       updateCard(touchCard({ ...existing, name, number, format, category, notes, color: selectedColor, emoji: selectedEmoji }));
-      showToast('Card updated!');
+      showToast('Item updated!');
     }
   } else {
     addCard(makeCard({ name, number, format, category, notes, color: selectedColor, emoji: selectedEmoji }));
-    showToast('Card added! 🎉');
+    showToast('Item added! 🎉');
   }
 
   closeSheet('add-overlay');
@@ -285,11 +285,11 @@ export async function saveCard(): Promise<void> {
 }
 
 export async function deleteCurrentCard(): Promise<void> {
-  if (!currentCardId || !confirm('Delete this card?')) return;
+  if (!currentCardId || !confirm('Delete this item?')) return;
   removeCard(currentCardId);
   closeSheet('detail-overlay');
   renderCards();
-  showToast('Card deleted');
+  showToast('Item deleted');
   await pushToRemote();
 }
 
@@ -301,7 +301,7 @@ export function updateFormPreview(): void {
   const wrap    = document.getElementById('form-barcode-preview');
   if (!wrap) return;
 
-  if (!number) { wrap.innerHTML = '<p class="preview-error">Enter a card number above</p>'; return; }
+  if (!number) { wrap.innerHTML = '<p class="preview-error">Enter an item number above</p>'; return; }
 
   if (format === 'QR') {
     wrap.innerHTML = '<div id="form-qr-preview"></div>';
@@ -398,9 +398,9 @@ export function exportCards(): void {
   const blob = new Blob([JSON.stringify(getCards(), null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = 'cardex-backup.json';
+  a.download = 'foodie-backup.json';
   a.click();
-  showToast('Cards exported!');
+  showToast('Items exported!');
 }
 
 export async function importCards(e: Event): Promise<void> {
@@ -419,7 +419,7 @@ export async function importCards(e: Event): Promise<void> {
       }
     }
     renderCards();
-    showToast(`Imported ${added} card(s)`);
+    showToast(`Imported ${added} item(s)`);
     await pushToRemote();
   } catch {
     showToast('Import failed: invalid file');

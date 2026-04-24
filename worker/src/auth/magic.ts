@@ -28,9 +28,9 @@ export async function magicSend(request: Request, env: Env): Promise<Response> {
   const result = await sendBrevoEmail({
     apiKey:    env.BREVO_API_KEY,
     to:        email,
-    fromEmail: env.EMAIL_FROM      || 'noreply@cardex.app',
-    fromName:  env.EMAIL_FROM_NAME || 'Cardex',
-    subject:   'Your Cardex sign-in link',
+    fromEmail: env.EMAIL_FROM      || 'noreply@foodie.app',
+    fromName:  env.EMAIL_FROM_NAME || 'Foodie',
+    subject:   'Your Foodie sign-in link',
     html:      buildEmailHtml(magicUrl),
   });
 
@@ -91,13 +91,13 @@ async function sendBrevoEmail(opts: BrevoOptions): Promise<{ ok: boolean; body: 
 function buildEmailHtml(magicUrl: string): string {
   return `
     <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f9f9fb;border-radius:12px">
-      <h1 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0a0a0f">Sign in to Cardex</h1>
+      <h1 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0a0a0f">Sign in to Foodie</h1>
       <p style="color:#555;margin:0 0 28px;line-height:1.6">
         Click the button below to sign in. This link expires in <strong>15 minutes</strong> and can only be used once.
       </p>
       <a href="${magicUrl}"
          style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#7c6dfa,#fa6d9a);color:white;text-decoration:none;border-radius:10px;font-weight:600;font-size:16px">
-        Sign in to Cardex
+        Sign in to Foodie
       </a>
       <p style="color:#999;font-size:12px;margin:28px 0 0;line-height:1.6">
         If you didn't request this, you can safely ignore this email.<br/>

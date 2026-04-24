@@ -65,4 +65,4 @@ jobs:
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Deploys to the staging Pages project (separate from production)
-          command:   pages deploy dist --project-name=cardex-staging
+          command:   pages deploy dist --project-name=foodie-staging

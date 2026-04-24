@@ -3,68 +3,68 @@ import type { Env, User, Credential, ChallengeData, MagicLinkData, Card, Tombsto
 // ── User ─────────────────────────────────────────────────────────────────────
 
 export const getUser = (env: Env, userId: string) =>
-  env.CARDEX_KV.get<User>(`user:${userId}`, 'json');
+  env.FOODIE_KV.get<User>(`user:${userId}`, 'json');
 
 export const putUser = (env: Env, user: User) =>
-  env.CARDEX_KV.put(`user:${user.id}`, JSON.stringify(user));
+  env.FOODIE_KV.put(`user:${user.id}`, JSON.stringify(user));
 
 export const getUserIdByEmail = (env: Env, email: string) =>
-  env.CARDEX_KV.get(`email:${email}`);
+  env.FOODIE_KV.get(`email:${email}`);
 
 export const putEmailIndex = (env: Env, email: string, userId: string) =>
-  env.CARDEX_KV.put(`email:${email}`, userId);
+  env.FOODIE_KV.put(`email:${email}`, userId);
 
 // ── Credential ────────────────────────────────────────────────────────────────
 
 export const getCredential = (env: Env, credId: string) =>
-  env.CARDEX_KV.get<Credential>(`cred:${credId}`, 'json');
+  env.FOODIE_KV.get<Credential>(`cred:${credId}`, 'json');
 
 export const putCredential = (env: Env, credId: string, cred: Credential) =>
-  env.CARDEX_KV.put(`cred:${credId}`, JSON.stringify(cred));
+  env.FOODIE_KV.put(`cred:${credId}`, JSON.stringify(cred));
 
 // ── Challenge ─────────────────────────────────────────────────────────────────
 
 export const putChallenge = (env: Env, token: string, data: ChallengeData) =>
-  env.CARDEX_KV.put(`challenge:${token}`, JSON.stringify(data), { expirationTtl: 300 });
+  env.FOODIE_KV.put(`challenge:${token}`, JSON.stringify(data), { expirationTtl: 300 });
 
 export async function getAndDeleteChallenge(
   env:   Env,
   token: string,
 ): Promise<ChallengeData | null> {
-  const data = await env.CARDEX_KV.get<ChallengeData>(`challenge:${token}`, 'json');
-  if (data) await env.CARDEX_KV.delete(`challenge:${token}`);
+  const data = await env.FOODIE_KV.get<ChallengeData>(`challenge:${token}`, 'json');
+  if (data) await env.FOODIE_KV.delete(`challenge:${token}`);
   return data;
 }
 
 // ── Magic link ────────────────────────────────────────────────────────────────
 
 export const putMagicLink = (env: Env, token: string, data: MagicLinkData) =>
-  env.CARDEX_KV.put(`magiclink:${token}`, JSON.stringify(data), { expirationTtl: 900 });
+  env.FOODIE_KV.put(`magiclink:${token}`, JSON.stringify(data), { expirationTtl: 900 });
 
 export async function getAndDeleteMagicLink(
   env:   Env,
   token: string,
 ): Promise<MagicLinkData | null> {
-  const data = await env.CARDEX_KV.get<MagicLinkData>(`magiclink:${token}`, 'json');
-  if (data) await env.CARDEX_KV.delete(`magiclink:${token}`);
+  const data = await env.FOODIE_KV.get<MagicLinkData>(`magiclink:${token}`, 'json');
+  if (data) await env.FOODIE_KV.delete(`magiclink:${token}`);
   return data;
 }
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
 
 export const getCards = (env: Env, userId: string) =>
-  env.CARDEX_KV.get<Card[]>(`cards:${userId}`, 'json');
+  env.FOODIE_KV.get<Card[]>(`cards:${userId}`, 'json');
 
 export const putCards = (env: Env, userId: string, cards: Card[]) =>
-  env.CARDEX_KV.put(`cards:${userId}`, JSON.stringify(cards));
+  env.FOODIE_KV.put(`cards:${userId}`, JSON.stringify(cards));
 
 // ── Tombstones ────────────────────────────────────────────────────────────────
 
 export const getTombstones = (env: Env, userId: string) =>
-  env.CARDEX_KV.get<Tombstone[]>(`tombstones:${userId}`, 'json');
+  env.FOODIE_KV.get<Tombstone[]>(`tombstones:${userId}`, 'json');
 
 export const putTombstones = (env: Env, userId: string, tombstones: Tombstone[]) =>
-  env.CARDEX_KV.put(`tombstones:${userId}`, JSON.stringify(tombstones));
+  env.FOODIE_KV.put(`tombstones:${userId}`, JSON.stringify(tombstones));
 
 // ── User upsert (shared by passkey + magic link registration) ─────────────────
 
