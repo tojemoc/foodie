@@ -56,7 +56,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL_STAGING }}
+          VITE_API_URL: https://foodie-api-staging.tojemoc.workers.dev
 
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3
@@ -65,4 +65,4 @@ jobs:
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Deploys to the staging Pages project (separate from production)
-          command:   pages deploy dist --project-name=foodie-staging
+          command:   pages deploy dist --project-name=foodie-staging --branch=main

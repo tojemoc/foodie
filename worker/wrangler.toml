@@ -10,8 +10,8 @@ id      = "c10dfc1b686d4d95a207bc18f5f96573"
 
 # ── Production vars ────────────────────────────────────────────
 [vars]
-FRONTEND_ORIGIN  = "https://foodie.tjm.sk"
-FRONTEND_RP_ID   = "foodie.tjm.sk"
+FRONTEND_ORIGIN  = "https://foodie-prod.pages.dev"
+FRONTEND_RP_ID   = "foodie-prod.pages.dev"
 EMAIL_FROM       = "foodie@tjm.sk"
 EMAIL_FROM_NAME  = "Foodie Team"
 
@@ -28,7 +28,7 @@ name = "foodie-api-staging"
 
 [[env.staging.kv_namespaces]]
 binding = "FOODIE_KV"
-id      = "29f06f6ce72b4c61b0223da13dda1346"
+id      = "f14a4873b1144683b90317d75b6a79ab"
 
 [env.staging.vars]
 FRONTEND_ORIGIN  = "https://foodie-staging.pages.dev"

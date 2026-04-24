@@ -110,15 +110,23 @@ npm run dev                 # http://localhost:5173
 ## 4 — Deploy
 
 ```bash
-# Worker
-cd worker && npm run deploy
-
 # Frontend
 npm run build
 wrangler pages deploy dist --project-name=your-project
 ```
 
-Or push to `main` — GitHub Actions (`deploy.yml`) handles both automatically.
+Staging (configured):
+- Frontend: `https://foodie-staging.pages.dev/`
+- Worker API: `https://foodie-api-staging.tojemoc.workers.dev/`
+- KV namespace id: `f14a4873b1144683b90317d75b6a79ab`
+
+Production currently has Pages only:
+- Frontend: `https://foodie-prod.pages.dev/`
+- Worker API: not created yet
+
+GitHub Actions:
+- `staging.yml` deploys both staging Worker + staging Pages.
+- `release.yml` deploys production Pages only (Worker deploy step intentionally disabled until production Worker exists).
 
 ### GitHub Actions secrets needed
 
