@@ -1,9 +1,9 @@
-# Cardex — Loyalty Wallet
+# Foodie — Food & Grocery Tracker
 
-A PWA loyalty card wallet with passkey (WebAuthn) + magic link auth and Cloudflare KV sync.
+A PWA food or grocery item wallet with passkey (WebAuthn) + magic link auth and Cloudflare KV sync.
 
 ```
-cardex/
+foodie/
 ├── src/                  # Vite + TypeScript frontend
 │   ├── api.ts            # All Worker fetch calls
 │   ├── types.ts          # Shared types
@@ -63,14 +63,14 @@ cd worker
 npm install
 
 # Create the KV namespace
-wrangler kv:namespace create CARDEX_KV
+wrangler kv:namespace create FOODIE_KV
 # Copy the returned id into worker/wrangler.toml → kv_namespaces[0].id
 
 # Edit wrangler.toml [vars] — set your Pages domain:
 #   FRONTEND_ORIGIN = "https://your-project.pages.dev"
 #   FRONTEND_RP_ID  = "your-project.pages.dev"
 #   EMAIL_FROM      = "noreply@yourdomain.com"
-#   EMAIL_FROM_NAME = "Cardex"
+#   EMAIL_FROM_NAME = "Foodie"
 
 # Set secrets (never committed)
 wrangler secret put JWT_SECRET      # paste any long random string
@@ -87,7 +87,7 @@ npm install
 
 cp .env.example .env.local
 # Edit .env.local:
-#   VITE_API_URL=https://cardex-api.YOUR-SUBDOMAIN.workers.dev
+#   VITE_API_URL=https://foodie-api.YOUR-SUBDOMAIN.workers.dev
 ```
 
 ---
@@ -110,15 +110,23 @@ npm run dev                 # http://localhost:5173
 ## 4 — Deploy
 
 ```bash
-# Worker
-cd worker && npm run deploy
-
 # Frontend
 npm run build
 wrangler pages deploy dist --project-name=your-project
 ```
 
-Or push to `main` — GitHub Actions (`deploy.yml`) handles both automatically.
+Staging (configured):
+- Frontend: `https://foodie-staging.pages.dev/`
+- Worker API: `https://foodie-api-staging.tojemoc.workers.dev/`
+- KV namespace id: `f14a4873b1144683b90317d75b6a79ab`
+
+Production currently has Pages only:
+- Frontend: `https://foodie-prod.pages.dev/`
+- Worker API: not created yet
+
+GitHub Actions:
+- `staging.yml` deploys both staging Worker + staging Pages.
+- `release.yml` deploys production Pages only (Worker deploy step intentionally disabled until production Worker exists).
 
 ### GitHub Actions secrets needed
 

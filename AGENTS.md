@@ -1,6 +1,6 @@
-# Cardex — Loyalty Wallet
+# Foodie — Food & Grocery Tracker
 
-PWA loyalty card wallet with passkey/magic-link auth and Cloudflare KV sync. Two packages: Vite frontend (root) and Cloudflare Worker API (`worker/`).
+PWA food or grocery item wallet with passkey/magic-link auth and Cloudflare KV sync. Two packages: Vite frontend (root) and Cloudflare Worker API (`worker/`).
 
 ## Cursor Cloud specific instructions
 

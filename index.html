@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Cardex — Loyalty Wallet</title>
+  <title>Foodie — Food & Grocery Tracker</title>
 
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -26,8 +26,8 @@
 
   <!-- ═══ AUTH SCREEN ═══ -->
   <div id="auth-screen" class="auth-screen" style="display:none">
-    <div class="auth-logo">Cardex<span>.</span></div>
-    <div class="auth-tagline">Your loyalty cards, everywhere.</div>
+    <div class="auth-logo">Foodie<span>.</span></div>
+    <div class="auth-tagline">Your food and groceries, everywhere.</div>
 
     <!-- Login -->
     <div class="auth-card" id="auth-login-panel">
@@ -88,7 +88,7 @@
   <div id="main-app" style="display:none; flex-direction:column; flex:1">
 
     <header class="header">
-      <div class="logo" id="logo">Cardex<span>.</span></div>
+      <div class="logo" id="logo">Foodie<span>.</span></div>
       <div class="header-right">
         <div class="sync-indicator">
           <div class="sync-dot" id="sync-dot"></div>
@@ -121,11 +121,11 @@
       <div class="search-wrap" id="search-bar" style="display:none">
         <div class="search-wrap-inner">
           <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
-          <input class="search-input" type="text" id="search-input" placeholder="Search cards…" />
+          <input class="search-input" type="text" id="search-input" placeholder="Search food and groceries…" />
         </div>
       </div>
       <div class="cards-section">
-        <div class="section-label" id="cards-count">0 cards</div>
+        <div class="section-label" id="cards-count">0 items</div>
         <div class="card-grid" id="card-grid"></div>
       </div>
     </div>
@@ -139,11 +139,11 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="settings-item" id="export-btn">
-          <div class="settings-item-left"><div class="settings-item-icon">📤</div><div class="settings-item-text"><h4>Export cards</h4><p>Save as JSON backup</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">📤</div><div class="settings-item-text"><h4>Export items</h4><p>Save as JSON backup</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="settings-item" onclick="document.getElementById('import-input').click()">
-          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import cards</h4><p>Restore from JSON backup</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import items</h4><p>Restore from JSON backup</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <input type="file" id="import-input" accept=".json" style="display:none" />
@@ -151,7 +151,7 @@
       <div class="settings-section">
         <h3>About</h3>
         <div class="settings-item" style="cursor:default">
-          <div class="settings-item-left"><div class="settings-item-icon">💳</div><div class="settings-item-text"><h4>Cardex</h4><p id="app-version">—</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">💳</div><div class="settings-item-text"><h4>Foodie</h4><p id="app-version">—</p></div></div>
         </div>
       </div>
     </div>
@@ -168,7 +168,7 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <span class="sheet-title">Card</span>
+      <span class="sheet-title">Item</span>
       <button class="close-btn" data-close-sheet="detail-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="card-detail-header" id="detail-card-header">
@@ -197,12 +197,12 @@
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <span class="sheet-title" id="add-sheet-title">Add Card</span>
+      <span class="sheet-title" id="add-sheet-title">Add Item</span>
       <button class="close-btn" data-close-sheet="add-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="form-body">
       <div class="field"><label>Store name *</label><input type="text" id="f-name" placeholder="e.g. Tesco, Boots, Starbucks…" /></div>
-      <div class="field"><label>Card / Barcode number *</label><input type="text" id="f-number" placeholder="Scan or type your card number" /></div>
+      <div class="field"><label>Item / Barcode number *</label><input type="text" id="f-number" placeholder="Scan or type your barcode number" /></div>
       <div class="field">
         <label>Barcode format</label>
         <select id="f-format">
@@ -215,7 +215,7 @@
           <option value="QR">QR Code only</option>
         </select>
       </div>
-      <div class="field"><label>Barcode preview</label><div class="barcode-preview-wrap" id="form-barcode-preview"><p class="preview-error">Enter a card number above</p></div></div>
+      <div class="field"><label>Barcode preview</label><div class="barcode-preview-wrap" id="form-barcode-preview"><p class="preview-error">Enter an item number above</p></div></div>
       <div class="field">
         <label>Category</label>
         <select id="f-category">
@@ -229,11 +229,11 @@
         </select>
       </div>
       <div class="field"><label>Icon / Emoji</label><div class="emoji-picker-row" id="emoji-picker"></div></div>
-      <div class="field"><label>Card colour</label><div class="color-picker-row" id="color-picker"></div></div>
+      <div class="field"><label>Item colour</label><div class="color-picker-row" id="color-picker"></div></div>
       <div class="field"><label>Notes (points, member ID…)</label><input type="text" id="f-notes" placeholder="Optional…" /></div>
     </div>
     <div style="padding:20px 20px 0">
-      <button class="btn btn-primary" style="width:100%" id="save-card-btn">Save Card</button>
+      <button class="btn btn-primary" style="width:100%" id="save-card-btn">Save Item</button>
     </div>
   </div>
 </div>

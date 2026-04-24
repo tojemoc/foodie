@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Cardex Hosted/Demo
-    url: https://cardex.tjm.sk
+  - name: Foodie Hosted/Demo
+    url: https://foodie.tjm.sk
     about: Try it out yourself before deploying
   - name: PM/Developer
     url: https://jakubdobos.eu

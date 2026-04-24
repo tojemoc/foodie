@@ -34,7 +34,7 @@ export async function registerBegin(request: Request, env: Env): Promise<Respons
   return jsonResponse({
     options: {
       challenge,
-      rp:   { name: 'Cardex Loyalty Wallet', id: getRpId(env) },
+      rp:   { name: 'Foodie Food & Grocery Tracker', id: getRpId(env) },
       user: {
         id:          userId,
         name:        email,
