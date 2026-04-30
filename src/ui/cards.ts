@@ -83,22 +83,46 @@ export function renderCards(): void {
     return;
   }
 
-  grid.innerHTML = filtered.map(c => `
-    <div class="card-tile" style="background:${c.color}" data-card-id="${c.id}">
-      <div>
-        <div class="card-tile-icon">${placementEmoji(getPlacement(c))}</div>
-        <div class="card-tile-name">${esc(displayName(c))}</div>
-        <div class="card-tile-number">${esc(c.number)}</div>
-      </div>
-      <div class="card-tile-points">${esc(getPlacement(c))}</div>
-    </div>`).join('');
+  // Clear grid and build cards using DOM construction to prevent XSS
+  grid.innerHTML = '';
 
-  grid.querySelectorAll<HTMLElement>('.card-tile').forEach(el => {
-    el.addEventListener('click', () => {
-      const id = el.dataset['cardId'];
+  for (const c of filtered) {
+    const tile = document.createElement('div');
+    tile.className = 'card-tile';
+    tile.style.background = c.color;
+    tile.dataset.cardId = String(c.id);
+
+    const contentDiv = document.createElement('div');
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'card-tile-icon';
+    iconDiv.textContent = placementEmoji(getPlacement(c));
+    contentDiv.appendChild(iconDiv);
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'card-tile-name';
+    nameDiv.textContent = displayName(c);
+    contentDiv.appendChild(nameDiv);
+
+    const numberDiv = document.createElement('div');
+    numberDiv.className = 'card-tile-number';
+    numberDiv.textContent = c.number;
+    contentDiv.appendChild(numberDiv);
+
+    tile.appendChild(contentDiv);
+
+    const pointsDiv = document.createElement('div');
+    pointsDiv.className = 'card-tile-points';
+    pointsDiv.textContent = getPlacement(c);
+    tile.appendChild(pointsDiv);
+
+    tile.addEventListener('click', () => {
+      const id = tile.dataset['cardId'];
       if (id) openDetail(id);
     });
-  });
+
+    grid.appendChild(tile);
+  }
 }
 
 export function filterByCategory(el: HTMLElement, cat: string): void {
@@ -184,8 +208,20 @@ export function openAddSheet(prefill?: Card): void {
   setValue('f-number',       prefill?.number      ?? '');
   setValue('f-format',       prefill?.format      ?? 'EAN13');
   setValue('f-expiry',       prefill?.expiryDate  ?? '');
-  setValue('f-placement',    prefill?.placement ?? cap(prefill?.category ?? 'Cupboard'));
-  setValue('f-placement-custom', '');
+
+  // Handle placement: preserve custom placements from prefill
+  const prefillPlacement = prefill?.placement ?? cap(prefill?.category ?? 'Cupboard');
+  const isKnownPlacement = DEFAULT_PLACEMENTS.includes(prefillPlacement);
+
+  if (isKnownPlacement) {
+    setValue('f-placement', prefillPlacement);
+    setValue('f-placement-custom', '');
+  } else {
+    // Custom placement: set to a default select value and populate custom field
+    setValue('f-placement', 'Other');
+    setValue('f-placement-custom', prefillPlacement);
+  }
+
   setValue('f-template', '');
 
   // Inject scan button next to the number field (only if not already there)
@@ -529,7 +565,9 @@ export async function importCards(e: Event): Promise<void> {
     const existing = new Set(getCards().map(c => c.id));
     let added = 0;
     for (const c of imported) {
-      if (c.id && c.name && c.number && !existing.has(c.id)) {
+      // Allow cards without barcode number if they are fresh template items
+      const hasValidNumber = c.number || isFreshTemplatePlacement(c.placement || '');
+      if (c.id && c.name && hasValidNumber && !existing.has(c.id)) {
         addCard(c);
         added++;
       }
