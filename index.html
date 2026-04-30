@@ -108,16 +108,7 @@
     </header>
 
     <div id="page-home" class="page active" style="padding:0">
-      <div class="chips-row">
-        <div class="chip active" data-cat="all">All</div>
-        <div class="chip" data-cat="grocery">🛒 Grocery</div>
-        <div class="chip" data-cat="pharmacy">💊 Pharmacy</div>
-        <div class="chip" data-cat="fashion">👗 Fashion</div>
-        <div class="chip" data-cat="coffee">☕ Coffee</div>
-        <div class="chip" data-cat="fuel">⛽ Fuel</div>
-        <div class="chip" data-cat="travel">✈️ Travel</div>
-        <div class="chip" data-cat="other">📦 Other</div>
-      </div>
+      <div class="chips-row" id="placement-chips"></div>
       <div class="search-wrap" id="search-bar" style="display:none">
         <div class="search-wrap-inner">
           <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
@@ -202,51 +193,76 @@
       <button class="close-btn" data-close-sheet="add-overlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="form-body">
-      <div class="field"><label>Store name *</label><input type="text" id="f-name" placeholder="e.g. Tesco, Boots, Starbucks…" /></div>
-      <div class="field">
-        <label>Product name</label>
-        <input type="text" id="f-product-name" placeholder="Auto-filled from barcode lookup when available" />
+      <div class="wizard-progress">
+        <span class="wizard-step-dot active" id="wizard-dot-1"></span>
+        <span class="wizard-step-dot" id="wizard-dot-2"></span>
       </div>
-      <div class="field">
-        <label>Brand</label>
-        <input type="text" id="f-brand" placeholder="Auto-filled from barcode lookup when available" />
-      </div>
-      <div class="field"><label>Item / Barcode number *</label><input type="text" id="f-number" placeholder="Scan or type your barcode number" /></div>
-      <div class="field">
-        <label>Barcode format</label>
-        <select id="f-format">
-          <option value="CODE128">CODE 128 (most common)</option>
-          <option value="EAN13">EAN-13</option>
-          <option value="EAN8">EAN-8</option>
-          <option value="UPC">UPC-A</option>
-          <option value="CODE39">CODE 39</option>
-          <option value="ITF14">ITF-14</option>
-          <option value="QR">QR Code only</option>
-        </select>
-      </div>
-      <div class="field"><label>Barcode preview</label><div class="barcode-preview-wrap" id="form-barcode-preview"><p class="preview-error">Enter an item number above</p></div></div>
-      <div class="field">
-        <label>Expiry date</label>
-        <input type="date" id="f-expiry" />
-      </div>
-      <div class="field">
-        <label>Category</label>
-        <select id="f-category">
-          <option value="grocery">🛒 Grocery</option>
-          <option value="pharmacy">💊 Pharmacy</option>
-          <option value="fashion">👗 Fashion</option>
-          <option value="coffee">☕ Coffee</option>
-          <option value="fuel">⛽ Fuel</option>
-          <option value="travel">✈️ Travel</option>
-          <option value="other">📦 Other</option>
-        </select>
-      </div>
-      <div class="field"><label>Icon / Emoji</label><div class="emoji-picker-row" id="emoji-picker"></div></div>
-      <div class="field"><label>Item colour</label><div class="color-picker-row" id="color-picker"></div></div>
-      <div class="field"><label>Notes (points, member ID…)</label><input type="text" id="f-notes" placeholder="Optional…" /></div>
+
+      <section class="wizard-slide active" id="wizard-step-1">
+        <div class="field">
+          <label>Fresh item template</label>
+          <select id="f-template">
+            <option value="">No template</option>
+            <option value="banana">Banana / loose fruit</option>
+            <option value="apple">Apples / firm fruit</option>
+            <option value="berries">Fresh berries</option>
+            <option value="leafy-greens">Leafy greens</option>
+            <option value="tomato">Tomatoes / peppers</option>
+            <option value="bread">Fresh bread / bakery</option>
+            <option value="pastries">Pastries / donuts</option>
+            <option value="milk">Fresh milk</option>
+            <option value="yogurt">Yogurt</option>
+            <option value="cheese">Soft cheese</option>
+            <option value="eggs">Eggs</option>
+            <option value="fresh-chicken">Fresh chicken</option>
+            <option value="fresh-beef">Fresh beef / butcher meat</option>
+            <option value="fresh-fish">Fresh fish</option>
+            <option value="fresh-herbs">Fresh herbs</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>EAN / barcode</label>
+          <input type="text" id="f-number" placeholder="Scan or type the barcode" />
+        </div>
+        <input type="hidden" id="f-format" value="EAN13" />
+        <div class="field">
+          <label>Product name *</label>
+          <input type="text" id="f-name" placeholder="Auto-filled from barcode lookup when available" />
+        </div>
+        <div class="field">
+          <label>Brand</label>
+          <input type="text" id="f-brand" placeholder="Optional brand name" />
+        </div>
+      </section>
+
+      <section class="wizard-slide" id="wizard-step-2">
+        <div class="field">
+          <label>Expiry date</label>
+          <input type="date" id="f-expiry" />
+        </div>
+        <div class="field">
+          <label>Placement</label>
+          <select id="f-placement">
+            <option value="Fridge">Fridge</option>
+            <option value="Cupboard">Cupboard</option>
+            <option value="Freezer">Freezer</option>
+            <option value="Storage room">Storage room</option>
+            <option value="Pantry">Pantry</option>
+            <option value="Fruit bowl">Fruit bowl</option>
+            <option value="Countertop">Countertop</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Custom placement (optional)</label>
+          <input type="text" id="f-placement-custom" placeholder="e.g. Garage shelf, Office fridge" />
+        </div>
+      </section>
     </div>
-    <div style="padding:20px 20px 0">
-      <button class="btn btn-primary" style="width:100%" id="save-card-btn">Save Item</button>
+    <div class="wizard-actions">
+      <button class="btn btn-secondary" id="wizard-back-btn" style="display:none">Back</button>
+      <button class="btn btn-primary" id="wizard-next-btn">Next</button>
+      <button class="btn btn-primary" id="save-card-btn" style="display:none">Save Item</button>
     </div>
   </div>
 </div>

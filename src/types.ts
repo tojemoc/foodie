@@ -8,6 +8,7 @@ export interface Card {
   productName?: string;
   brand?:       string;
   expiryDate?:  string; // YYYY-MM-DD
+  placement?:   string;
   color:     string;
   emoji:     string;
   createdAt: string;

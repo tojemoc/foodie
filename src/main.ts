@@ -8,7 +8,7 @@ import {
 import {
   renderCards, filterByCategory, openDetail,
   openAddSheet, openEditSheet, saveCard, deleteCurrentCard,
-  updateFormPreview, buildEmojiPicker, buildColorPicker,
+  handleNumberInput, nextWizardStep, prevWizardStep, applyFreshTemplate, buildPlacementChips,
   exportCards, importCards, openSheet, closeSheet,
   closeOnBackdrop, showPage, toggleSearch, switchBarcodeView,
 } from './ui/cards.js';
@@ -18,8 +18,7 @@ import { notifyExpiring }            from './notifications/expiry.js';
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
-  buildEmojiPicker();
-  buildColorPicker();
+  buildPlacementChips();
   loadFromLocalStorage();
 
   // 1. Check for ?magic= token first
@@ -140,14 +139,11 @@ function wire(): void {
     });
   });
 
-  // Category chips
-  document.querySelectorAll<HTMLElement>('.chip').forEach(chip => {
-    chip.addEventListener('click', () => filterByCategory(chip, chip.dataset['cat'] ?? 'all'));
-  });
-
   // Add form
-  on('f-number', 'input',  () => updateFormPreview());
-  on('f-format', 'change', () => updateFormPreview());
+  on('f-number', 'input',  () => handleNumberInput());
+  on('f-template', 'change', () => applyFreshTemplate());
+  on('wizard-next-btn', 'click', () => nextWizardStep());
+  on('wizard-back-btn', 'click', () => prevWizardStep());
   on('save-card-btn',    'click', () => saveCard());
   on('edit-card-btn',    'click', () => openEditSheet());
   on('delete-card-btn',  'click', () => deleteCurrentCard());

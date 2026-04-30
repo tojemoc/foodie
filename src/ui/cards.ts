@@ -22,7 +22,26 @@ export const COLORS = [
   'linear-gradient(135deg,#64748b,#475569)',
 ];
 
-export const EMOJIS = ['🛒','💊','👗','☕','⛽','✈️','🍔','🎮','📦','🏥','💄','👟','🏠','🎵','🐾','💪','🍕','🌟'];
+const DEFAULT_PLACEMENTS = ['Fridge', 'Cupboard', 'Freezer', 'Storage room', 'Pantry', 'Fruit bowl', 'Countertop', 'Other'];
+const WIZARD_STEPS = 2;
+
+const FRESH_ITEM_TEMPLATES: Record<string, { name: string; brand?: string; placement: string; expiryDays: number }> = {
+  banana:         { name: 'Banana', placement: 'Fruit bowl', expiryDays: 4 },
+  apple:          { name: 'Apple', placement: 'Fruit bowl', expiryDays: 10 },
+  berries:        { name: 'Fresh berries', placement: 'Fridge', expiryDays: 3 },
+  'leafy-greens': { name: 'Leafy greens', placement: 'Fridge', expiryDays: 3 },
+  tomato:         { name: 'Tomatoes', placement: 'Countertop', expiryDays: 5 },
+  bread:          { name: 'Fresh bread', placement: 'Cupboard', expiryDays: 3 },
+  pastries:       { name: 'Pastries', placement: 'Cupboard', expiryDays: 2 },
+  milk:           { name: 'Milk', placement: 'Fridge', expiryDays: 6 },
+  yogurt:         { name: 'Yogurt', placement: 'Fridge', expiryDays: 10 },
+  cheese:         { name: 'Soft cheese', placement: 'Fridge', expiryDays: 7 },
+  eggs:           { name: 'Eggs', placement: 'Fridge', expiryDays: 21 },
+  'fresh-chicken':{ name: 'Fresh chicken', placement: 'Fridge', expiryDays: 2 },
+  'fresh-beef':   { name: 'Fresh beef', placement: 'Fridge', expiryDays: 3 },
+  'fresh-fish':   { name: 'Fresh fish', placement: 'Fridge', expiryDays: 1 },
+  'fresh-herbs':  { name: 'Fresh herbs', placement: 'Fridge', expiryDays: 5 },
+};
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -30,8 +49,7 @@ let currentCardId: string | null = null;
 let currentFilter = 'all';
 let barcodeView: 'barcode' | 'qr' = 'barcode';
 let editMode = false;
-let selectedColor = COLORS[0]!;
-let selectedEmoji = EMOJIS[0]!;
+let wizardStep = 1;
 
 // ── Card grid ─────────────────────────────────────────────────────────────────
 
@@ -39,10 +57,11 @@ export function renderCards(): void {
   const grid  = document.getElementById('card-grid');
   const count = document.getElementById('cards-count');
   if (!grid) return;
+  buildPlacementChips();
 
   const query = ((document.getElementById('search-input') as HTMLInputElement)?.value ?? '').toLowerCase();
   let filtered = getCards();
-  if (currentFilter !== 'all') filtered = filtered.filter(c => c.category === currentFilter);
+  if (currentFilter !== 'all') filtered = filtered.filter(c => getPlacement(c).toLowerCase() === currentFilter);
   if (query) filtered = filtered.filter(c =>
     c.name.toLowerCase().includes(query) || c.number.toLowerCase().includes(query)
   );
@@ -67,11 +86,11 @@ export function renderCards(): void {
   grid.innerHTML = filtered.map(c => `
     <div class="card-tile" style="background:${c.color}" data-card-id="${c.id}">
       <div>
-        <div class="card-tile-icon">${c.emoji}</div>
-        <div class="card-tile-name">${esc(c.name)}</div>
+        <div class="card-tile-icon">${placementEmoji(getPlacement(c))}</div>
+        <div class="card-tile-name">${esc(displayName(c))}</div>
         <div class="card-tile-number">${esc(c.number)}</div>
       </div>
-      ${c.notes ? `<div class="card-tile-points">${esc(c.notes)}</div>` : ''}
+      <div class="card-tile-points">${esc(getPlacement(c))}</div>
     </div>`).join('');
 
   grid.querySelectorAll<HTMLElement>('.card-tile').forEach(el => {
@@ -97,10 +116,10 @@ export function openDetail(id: string): void {
   currentCardId = id;
   barcodeView = card.format === 'QR' ? 'qr' : 'barcode';
 
-  setText('detail-icon',           card.emoji);
-  setText('detail-name',           card.name);
-  setText('detail-sub',            cap(card.category));
-  setText('detail-points',         card.notes);
+  setText('detail-icon',           placementEmoji(getPlacement(card)));
+  setText('detail-name',           displayName(card));
+  setText('detail-sub',            getPlacement(card));
+  setText('detail-points',         card.brand ?? '');
   setText('detail-barcode-number', card.number);
   setText('detail-expiry',         card.expiryDate ? `Expiry: ${card.expiryDate}` : '');
 
@@ -157,25 +176,17 @@ function renderDetailBarcode(card: Card): void {
 export function openAddSheet(prefill?: Card): void {
   editMode = !!prefill;
   setText('add-sheet-title', editMode ? 'Edit Item' : 'Add Item');
+  wizardStep = 1;
+  updateWizardUi();
 
-  setValue('f-name',         prefill?.name        ?? '');
-  setValue('f-product-name', prefill?.productName ?? '');
+  setValue('f-name',         prefill?.name        ?? prefill?.productName ?? '');
   setValue('f-brand',        prefill?.brand       ?? '');
   setValue('f-number',       prefill?.number      ?? '');
-  setValue('f-format',       prefill?.format      ?? 'CODE128');
-  setValue('f-category',     prefill?.category    ?? 'grocery');
-  setValue('f-notes',        prefill?.notes       ?? '');
+  setValue('f-format',       prefill?.format      ?? 'EAN13');
   setValue('f-expiry',       prefill?.expiryDate  ?? '');
-
-  selectedColor = prefill?.color ?? COLORS[0]!;
-  selectedEmoji = prefill?.emoji ?? EMOJIS[0]!;
-
-  buildEmojiPicker();
-  buildColorPicker();
-
-  const preview = document.getElementById('form-barcode-preview');
-  if (preview) preview.innerHTML = '<p class="preview-error">Enter an item number above</p>';
-  if (prefill?.number) setTimeout(updateFormPreview, 50);
+  setValue('f-placement',    prefill?.placement ?? cap(prefill?.category ?? 'Cupboard'));
+  setValue('f-placement-custom', '');
+  setValue('f-template', '');
 
   // Inject scan button next to the number field (only if not already there)
   injectScanButton();
@@ -236,12 +247,10 @@ async function handleScan(): Promise<void> {
 
     setValue('f-number', result.value);
 
-    const formatEl = document.getElementById('f-format') as HTMLSelectElement | null;
-    if (formatEl && result.format) formatEl.value = result.format;
+    const formatEl = document.getElementById('f-format') as HTMLInputElement | null;
+    if (formatEl) formatEl.value = result.format || detectBarcodeFormat(result.value);
 
     await prefillFromOpenFood(result.value);
-
-    updateFormPreview();
     showToast('Barcode scanned ✓');
   } catch (err) {
     if (err instanceof DOMException) {
@@ -267,17 +276,13 @@ async function prefillFromOpenFood(barcode: string): Promise<void> {
     showToast('Scanned. No product match found.');
     return;
   }
-  const existingProductName = getVal('f-product-name');
-  if (!existingProductName && lookup.productName) {
-    setValue('f-product-name', lookup.productName);
+  const existingName = getVal('f-name');
+  if (!existingName && lookup.productName) {
+    setValue('f-name', lookup.productName);
   }
   const existingBrand = getVal('f-brand');
   if (!existingBrand && lookup.brand) {
     setValue('f-brand', lookup.brand);
-  }
-  const existingCategory = getVal('f-category');
-  if (existingCategory === 'grocery' && lookup.category) {
-    setValue('f-category', lookup.category);
   }
   showToast('Product details found ✓');
 }
@@ -338,25 +343,25 @@ export function openEditSheet(): void {
 
 export async function saveCard(): Promise<void> {
   const name        = getVal('f-name');
-  const productName = getVal('f-product-name') || undefined;
   const brand       = getVal('f-brand') || undefined;
   const number      = getVal('f-number');
-  const format      = getVal('f-format');
-  const category    = getVal('f-category');
-  const notes       = getVal('f-notes');
+  const format      = getVal('f-format') || detectBarcodeFormat(number);
+  const category    = 'grocery';
+  const placement   = getPlacementInput();
+  const notes       = '';
   const expiryDate  = getVal('f-expiry');
 
-  if (!name)   { showToast('Please enter a store name'); return; }
+  if (!name)   { showToast('Please enter a product name'); return; }
   if (!number) { showToast('Please enter an item number'); return; }
 
   if (editMode && currentCardId) {
     const existing = getCards().find(c => c.id === currentCardId);
     if (existing) {
-      updateCard(touchCard({ ...existing, name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
+      updateCard(touchCard({ ...existing, name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: existing.color || COLORS[0]!, emoji: placementEmoji(placement) }));
       showToast('Item updated!');
     }
   } else {
-    addCard(makeCard({ name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
+    addCard(makeCard({ name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: COLORS[0]!, emoji: placementEmoji(placement) }));
     showToast('Item added! 🎉');
   }
 
@@ -375,56 +380,69 @@ export async function deleteCurrentCard(): Promise<void> {
   await pushToRemote();
 }
 
-// ── Form preview ──────────────────────────────────────────────────────────────
+// ── Add wizard ────────────────────────────────────────────────────────────────
 
-export function updateFormPreview(): void {
-  const number  = getVal('f-number');
-  const format  = getVal('f-format');
-  const wrap    = document.getElementById('form-barcode-preview');
-  if (!wrap) return;
-
-  if (!number) { wrap.innerHTML = '<p class="preview-error">Enter an item number above</p>'; return; }
-
-  if (format === 'QR') {
-    wrap.innerHTML = '<div id="form-qr-preview"></div>';
-    renderQR('form-qr-preview', number);
-    return;
+export function nextWizardStep(): void {
+  if (wizardStep < WIZARD_STEPS) {
+    wizardStep += 1;
+    updateWizardUi();
   }
+}
 
-  wrap.innerHTML = '<svg id="form-barcode-svg"></svg>';
-  if (!renderBarcode('form-barcode-svg', number, format))
-    wrap.innerHTML = `<p class="preview-error">⚠️ Invalid for ${format}. Try CODE 128 or QR.</p>`;
+export function prevWizardStep(): void {
+  if (wizardStep > 1) {
+    wizardStep -= 1;
+    updateWizardUi();
+  }
+}
+
+export function applyFreshTemplate(): void {
+  const templateKey = getVal('f-template');
+  if (!templateKey) return;
+  const template = FRESH_ITEM_TEMPLATES[templateKey];
+  if (!template) return;
+  if (!getVal('f-name')) setValue('f-name', template.name);
+  if (template.brand && !getVal('f-brand')) setValue('f-brand', template.brand);
+  setValue('f-placement', template.placement);
+  if (!getVal('f-expiry')) setValue('f-expiry', addDays(template.expiryDays));
+}
+
+export function handleNumberInput(): void {
+  const number = getVal('f-number');
+  if (!number) return;
+  setValue('f-format', detectBarcodeFormat(number));
+}
+
+function updateWizardUi(): void {
+  const step1 = document.getElementById('wizard-step-1');
+  const step2 = document.getElementById('wizard-step-2');
+  step1?.classList.toggle('active', wizardStep === 1);
+  step2?.classList.toggle('active', wizardStep === 2);
+  document.getElementById('wizard-dot-1')?.classList.toggle('active', wizardStep >= 1);
+  document.getElementById('wizard-dot-2')?.classList.toggle('active', wizardStep >= 2);
+
+  const backBtn = document.getElementById('wizard-back-btn');
+  const nextBtn = document.getElementById('wizard-next-btn');
+  const saveBtn = document.getElementById('save-card-btn');
+  if (backBtn) backBtn.style.display = wizardStep === 1 ? 'none' : '';
+  if (nextBtn) nextBtn.style.display = wizardStep === WIZARD_STEPS ? 'none' : '';
+  if (saveBtn) saveBtn.style.display = wizardStep === WIZARD_STEPS ? '' : 'none';
 }
 
 // ── Pickers ───────────────────────────────────────────────────────────────────
 
-export function buildEmojiPicker(): void {
-  const el = document.getElementById('emoji-picker');
+export function buildPlacementChips(): void {
+  const el = document.getElementById('placement-chips');
   if (!el) return;
-  el.innerHTML = EMOJIS.map(e =>
-    `<div class="emoji-opt ${e === selectedEmoji ? 'selected' : ''}" data-emoji="${e}">${e}</div>`
-  ).join('');
-  el.querySelectorAll<HTMLElement>('.emoji-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      selectedEmoji = opt.dataset['emoji'] ?? EMOJIS[0]!;
-      el.querySelectorAll('.emoji-opt').forEach(x => x.classList.remove('selected'));
-      opt.classList.add('selected');
-    });
-  });
-}
-
-export function buildColorPicker(): void {
-  const el = document.getElementById('color-picker');
-  if (!el) return;
-  el.innerHTML = COLORS.map(c =>
-    `<div class="color-swatch ${c === selectedColor ? 'selected' : ''}" style="background:${c}" data-color="${c}"></div>`
-  ).join('');
-  el.querySelectorAll<HTMLElement>('.color-swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-      selectedColor = sw.dataset['color'] ?? COLORS[0]!;
-      el.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('selected'));
-      sw.classList.add('selected');
-    });
+  const dynamicPlacements = new Set(DEFAULT_PLACEMENTS);
+  for (const card of getCards()) dynamicPlacements.add(getPlacement(card));
+  const placements = ['All', ...Array.from(dynamicPlacements)];
+  el.innerHTML = placements.map(placement => {
+    const filterKey = placement.toLowerCase();
+    return `<div class="chip ${currentFilter === filterKey ? 'active' : ''}" data-cat="${filterKey}">${placementEmoji(placement)} ${placement}</div>`;
+  }).join('');
+  el.querySelectorAll<HTMLElement>('.chip').forEach(chip => {
+    chip.addEventListener('click', () => filterByCategory(chip, chip.dataset['cat'] ?? 'all'));
   });
 }
 
@@ -527,6 +545,47 @@ function getVal(id: string): string {
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function displayName(card: Card): string {
+  return card.productName || card.name;
+}
+
+function getPlacement(card: Card): string {
+  if (card.placement) return card.placement;
+  return cap(card.category || 'other');
+}
+
+function getPlacementInput(): string {
+  const custom = getVal('f-placement-custom');
+  if (custom) return custom;
+  return getVal('f-placement') || 'Cupboard';
+}
+
+function placementEmoji(placement: string): string {
+  const p = placement.toLowerCase();
+  if (p.includes('fridge')) return '🧊';
+  if (p.includes('freezer')) return '❄️';
+  if (p.includes('cupboard') || p.includes('pantry')) return '🗄️';
+  if (p.includes('storage')) return '📦';
+  if (p.includes('fruit')) return '🍎';
+  if (p.includes('counter')) return '🏠';
+  return '🛒';
+}
+
+function detectBarcodeFormat(number: string): string {
+  const digitsOnly = /^\d+$/.test(number);
+  if (!digitsOnly) return 'CODE128';
+  if (number.length === 13) return 'EAN13';
+  if (number.length === 8) return 'EAN8';
+  if (number.length === 12) return 'UPC';
+  return 'EAN13';
+}
+
+function addDays(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function esc(s: string): string {
