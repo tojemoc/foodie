@@ -435,6 +435,38 @@ html, body {
 .field select         { appearance: none; }
 .field input::placeholder { color: var(--muted); }
 
+.field-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-action-btn {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.field-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.field-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .color-picker-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .color-swatch {
   width: 36px; height: 36px; border-radius: 50%; cursor: pointer;

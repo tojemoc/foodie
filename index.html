@@ -184,6 +184,7 @@
       <div id="barcode-container"><svg id="barcode-svg"></svg></div>
       <div id="qr-container" style="display:none"></div>
       <div class="barcode-number" id="detail-barcode-number"></div>
+      <div class="barcode-expiry" id="detail-expiry"></div>
     </div>
     <div class="actions-row">
       <button class="btn btn-secondary" id="edit-card-btn">✏️ Edit</button>
@@ -202,6 +203,14 @@
     </div>
     <div class="form-body">
       <div class="field"><label>Store name *</label><input type="text" id="f-name" placeholder="e.g. Tesco, Boots, Starbucks…" /></div>
+      <div class="field">
+        <label>Product name</label>
+        <input type="text" id="f-product-name" placeholder="Auto-filled from barcode lookup when available" />
+      </div>
+      <div class="field">
+        <label>Brand</label>
+        <input type="text" id="f-brand" placeholder="Auto-filled from barcode lookup when available" />
+      </div>
       <div class="field"><label>Item / Barcode number *</label><input type="text" id="f-number" placeholder="Scan or type your barcode number" /></div>
       <div class="field">
         <label>Barcode format</label>
@@ -216,6 +225,10 @@
         </select>
       </div>
       <div class="field"><label>Barcode preview</label><div class="barcode-preview-wrap" id="form-barcode-preview"><p class="preview-error">Enter an item number above</p></div></div>
+      <div class="field">
+        <label>Expiry date</label>
+        <input type="date" id="f-expiry" />
+      </div>
       <div class="field">
         <label>Category</label>
         <select id="f-category">

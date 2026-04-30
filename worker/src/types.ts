@@ -35,6 +35,9 @@ export interface Card {
   format:    string;
   category:  string;
   notes:     string;
+  productName?: string;
+  brand?:       string;
+  expiryDate?:  string; // YYYY-MM-DD
   color:     string;
   emoji:     string;
   createdAt: string;

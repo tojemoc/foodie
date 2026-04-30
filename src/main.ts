@@ -13,6 +13,7 @@ import {
   closeOnBackdrop, showPage, toggleSearch, switchBarcodeView,
 } from './ui/cards.js';
 import { showToast }                from './ui/toast.js';
+import { notifyExpiring }            from './notifications/expiry.js';
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ async function bootMainApp(): Promise<void> {
   document.getElementById('main-app')!.style.display        = 'flex';
 
   renderCards();
+  notifyExpiring(loadFromLocalStorage());
   await syncOnOpen();
 }
 

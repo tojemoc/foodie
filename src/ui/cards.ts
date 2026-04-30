@@ -4,6 +4,9 @@ import { pushToRemote }                from '../cards/sync.js';
 import { renderBarcode, renderQR }     from './barcode.js';
 import { showToast }                   from './toast.js';
 import { isSupported, startScan }      from '../scanner/scanner.js';
+import { lookupBarcode }               from '../services/openfood.js';
+import { captureAndReadExpiryDate, isExpiryOcrSupported } from '../scanner/expiry.js';
+import { notifyExpiring } from '../notifications/expiry.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +102,7 @@ export function openDetail(id: string): void {
   setText('detail-sub',            cap(card.category));
   setText('detail-points',         card.notes);
   setText('detail-barcode-number', card.number);
+  setText('detail-expiry',         card.expiryDate ? `Expiry: ${card.expiryDate}` : '');
 
   const hdr = document.getElementById('detail-card-header');
   if (hdr) hdr.style.background = card.color;
@@ -154,11 +158,14 @@ export function openAddSheet(prefill?: Card): void {
   editMode = !!prefill;
   setText('add-sheet-title', editMode ? 'Edit Item' : 'Add Item');
 
-  setValue('f-name',     prefill?.name     ?? '');
-  setValue('f-number',   prefill?.number   ?? '');
-  setValue('f-format',   prefill?.format   ?? 'CODE128');
-  setValue('f-category', prefill?.category ?? 'grocery');
-  setValue('f-notes',    prefill?.notes    ?? '');
+  setValue('f-name',         prefill?.name        ?? '');
+  setValue('f-product-name', prefill?.productName ?? '');
+  setValue('f-brand',        prefill?.brand       ?? '');
+  setValue('f-number',       prefill?.number      ?? '');
+  setValue('f-format',       prefill?.format      ?? 'CODE128');
+  setValue('f-category',     prefill?.category    ?? 'grocery');
+  setValue('f-notes',        prefill?.notes       ?? '');
+  setValue('f-expiry',       prefill?.expiryDate  ?? '');
 
   selectedColor = prefill?.color ?? COLORS[0]!;
   selectedEmoji = prefill?.emoji ?? EMOJIS[0]!;
@@ -172,6 +179,7 @@ export function openAddSheet(prefill?: Card): void {
 
   // Inject scan button next to the number field (only if not already there)
   injectScanButton();
+  injectExpiryOcrButton();
 
   openSheet('add-overlay');
 }
@@ -231,6 +239,8 @@ async function handleScan(): Promise<void> {
     const formatEl = document.getElementById('f-format') as HTMLSelectElement | null;
     if (formatEl && result.format) formatEl.value = result.format;
 
+    await prefillFromOpenFood(result.value);
+
     updateFormPreview();
     showToast('Barcode scanned ✓');
   } catch (err) {
@@ -251,6 +261,74 @@ async function handleScan(): Promise<void> {
   }
 }
 
+async function prefillFromOpenFood(barcode: string): Promise<void> {
+  const lookup = await lookupBarcode(barcode);
+  if (!lookup) {
+    showToast('Scanned. No product match found.');
+    return;
+  }
+  const existingProductName = getVal('f-product-name');
+  if (!existingProductName && lookup.productName) {
+    setValue('f-product-name', lookup.productName);
+  }
+  const existingBrand = getVal('f-brand');
+  if (!existingBrand && lookup.brand) {
+    setValue('f-brand', lookup.brand);
+  }
+  const existingCategory = getVal('f-category');
+  if (existingCategory === 'grocery' && lookup.category) {
+    setValue('f-category', lookup.category);
+  }
+  showToast('Product details found ✓');
+}
+
+async function injectExpiryOcrButton(): Promise<void> {
+  if (document.getElementById('scan-expiry-btn')) return;
+  if (!isExpiryOcrSupported()) return;
+  const input = document.getElementById('f-expiry') as HTMLInputElement | null;
+  if (!input) return;
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;gap:8px;align-items:center';
+  input.parentNode!.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+  const btn = document.createElement('button');
+  btn.id = 'scan-expiry-btn';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Scan expiry date');
+  btn.textContent = 'OCR';
+  btn.style.cssText = [
+    'flex-shrink:0',
+    'height:46px',
+    'padding:0 14px',
+    'border-radius:10px',
+    'border:1px solid rgba(255,255,255,0.07)',
+    'background:#1c1c27',
+    'color:#7070a0',
+    'cursor:pointer',
+    'font-weight:600',
+  ].join(';');
+  btn.addEventListener('click', handleExpiryScan);
+  wrapper.appendChild(btn);
+}
+
+async function handleExpiryScan(): Promise<void> {
+  const btn = document.getElementById('scan-expiry-btn') as HTMLButtonElement | null;
+  if (btn) btn.disabled = true;
+  try {
+    const result = await captureAndReadExpiryDate();
+    if (!result.expiryDate) {
+      showToast('No date found in image');
+      return;
+    }
+    setValue('f-expiry', result.expiryDate);
+    showToast('Expiry date detected ✓');
+  } catch {
+    showToast('Could not read expiry date');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 export function openEditSheet(): void {
   const card = getCards().find(c => c.id === currentCardId);
   if (!card) return;
@@ -259,11 +337,14 @@ export function openEditSheet(): void {
 }
 
 export async function saveCard(): Promise<void> {
-  const name     = getVal('f-name');
-  const number   = getVal('f-number');
-  const format   = getVal('f-format');
-  const category = getVal('f-category');
-  const notes    = getVal('f-notes');
+  const name        = getVal('f-name');
+  const productName = getVal('f-product-name') || undefined;
+  const brand       = getVal('f-brand') || undefined;
+  const number      = getVal('f-number');
+  const format      = getVal('f-format');
+  const category    = getVal('f-category');
+  const notes       = getVal('f-notes');
+  const expiryDate  = getVal('f-expiry');
 
   if (!name)   { showToast('Please enter a store name'); return; }
   if (!number) { showToast('Please enter an item number'); return; }
@@ -271,16 +352,17 @@ export async function saveCard(): Promise<void> {
   if (editMode && currentCardId) {
     const existing = getCards().find(c => c.id === currentCardId);
     if (existing) {
-      updateCard(touchCard({ ...existing, name, number, format, category, notes, color: selectedColor, emoji: selectedEmoji }));
+      updateCard(touchCard({ ...existing, name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
       showToast('Item updated!');
     }
   } else {
-    addCard(makeCard({ name, number, format, category, notes, color: selectedColor, emoji: selectedEmoji }));
+    addCard(makeCard({ name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
     showToast('Item added! 🎉');
   }
 
   closeSheet('add-overlay');
   renderCards();
+  notifyExpiring(getCards());
   await pushToRemote();
 }
 
