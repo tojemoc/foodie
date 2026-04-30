@@ -352,7 +352,7 @@ export async function saveCard(): Promise<void> {
   const expiryDate  = getVal('f-expiry');
 
   if (!name)   { showToast('Please enter a product name'); return; }
-  if (!number) { showToast('Please enter an item number'); return; }
+  if (!number && !isFreshTemplatePlacement(placement)) { showToast('Please enter an item number'); return; }
 
   if (editMode && currentCardId) {
     const existing = getCards().find(c => c.id === currentCardId);
@@ -437,13 +437,29 @@ export function buildPlacementChips(): void {
   const dynamicPlacements = new Set(DEFAULT_PLACEMENTS);
   for (const card of getCards()) dynamicPlacements.add(getPlacement(card));
   const placements = ['All', ...Array.from(dynamicPlacements)];
-  el.innerHTML = placements.map(placement => {
+
+  // Validate currentFilter: if not in placements, reset to 'all'
+  const validFilters = placements.map(p => p.toLowerCase());
+  if (!validFilters.includes(currentFilter)) {
+    currentFilter = 'all';
+  }
+
+  // Clear existing chips
+  el.innerHTML = '';
+
+  // Build chips using DOM methods to prevent XSS
+  for (const placement of placements) {
     const filterKey = placement.toLowerCase();
-    return `<div class="chip ${currentFilter === filterKey ? 'active' : ''}" data-cat="${filterKey}">${placementEmoji(placement)} ${placement}</div>`;
-  }).join('');
-  el.querySelectorAll<HTMLElement>('.chip').forEach(chip => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    if (currentFilter === filterKey) {
+      chip.classList.add('active');
+    }
+    chip.setAttribute('data-cat', filterKey);
+    chip.textContent = `${placementEmoji(placement)} ${placement}`;
     chip.addEventListener('click', () => filterByCategory(chip, chip.dataset['cat'] ?? 'all'));
-  });
+    el.appendChild(chip);
+  }
 }
 
 // ── Sheet helpers ─────────────────────────────────────────────────────────────
@@ -562,6 +578,12 @@ function getPlacementInput(): string {
   return getVal('f-placement') || 'Cupboard';
 }
 
+function isFreshTemplatePlacement(placement: string): boolean {
+  // Check if the placement matches any fresh-template placement
+  const templatePlacements = new Set(Object.values(FRESH_ITEM_TEMPLATES).map(t => t.placement));
+  return templatePlacements.has(placement);
+}
+
 function placementEmoji(placement: string): string {
   const p = placement.toLowerCase();
   if (p.includes('fridge')) return '🧊';
@@ -585,7 +607,10 @@ function detectBarcodeFormat(number: string): string {
 function addDays(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function esc(s: string): string {
