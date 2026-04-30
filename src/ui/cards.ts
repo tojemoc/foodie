@@ -158,12 +158,14 @@ export function openAddSheet(prefill?: Card): void {
   editMode = !!prefill;
   setText('add-sheet-title', editMode ? 'Edit Item' : 'Add Item');
 
-  setValue('f-name',     prefill?.name     ?? '');
-  setValue('f-number',   prefill?.number   ?? '');
-  setValue('f-format',   prefill?.format   ?? 'CODE128');
-  setValue('f-category', prefill?.category ?? 'grocery');
-  setValue('f-notes',    prefill?.notes    ?? '');
-  setValue('f-expiry',   prefill?.expiryDate ?? '');
+  setValue('f-name',         prefill?.name        ?? '');
+  setValue('f-product-name', prefill?.productName ?? '');
+  setValue('f-brand',        prefill?.brand       ?? '');
+  setValue('f-number',       prefill?.number      ?? '');
+  setValue('f-format',       prefill?.format      ?? 'CODE128');
+  setValue('f-category',     prefill?.category    ?? 'grocery');
+  setValue('f-notes',        prefill?.notes       ?? '');
+  setValue('f-expiry',       prefill?.expiryDate  ?? '');
 
   selectedColor = prefill?.color ?? COLORS[0]!;
   selectedEmoji = prefill?.emoji ?? EMOJIS[0]!;
@@ -265,17 +267,17 @@ async function prefillFromOpenFood(barcode: string): Promise<void> {
     showToast('Scanned. No product match found.');
     return;
   }
-  const existingName = getVal('f-name');
-  if (!existingName && lookup.productName) {
-    setValue('f-name', lookup.productName);
+  const existingProductName = getVal('f-product-name');
+  if (!existingProductName && lookup.productName) {
+    setValue('f-product-name', lookup.productName);
+  }
+  const existingBrand = getVal('f-brand');
+  if (!existingBrand && lookup.brand) {
+    setValue('f-brand', lookup.brand);
   }
   const existingCategory = getVal('f-category');
   if (existingCategory === 'grocery' && lookup.category) {
     setValue('f-category', lookup.category);
-  }
-  const notes = getVal('f-notes');
-  if (!notes && lookup.brand) {
-    setValue('f-notes', `Brand: ${lookup.brand}`);
   }
   showToast('Product details found ✓');
 }
@@ -335,12 +337,14 @@ export function openEditSheet(): void {
 }
 
 export async function saveCard(): Promise<void> {
-  const name     = getVal('f-name');
-  const number   = getVal('f-number');
-  const format   = getVal('f-format');
-  const category = getVal('f-category');
-  const notes    = getVal('f-notes');
-  const expiryDate = getVal('f-expiry');
+  const name        = getVal('f-name');
+  const productName = getVal('f-product-name') || undefined;
+  const brand       = getVal('f-brand') || undefined;
+  const number      = getVal('f-number');
+  const format      = getVal('f-format');
+  const category    = getVal('f-category');
+  const notes       = getVal('f-notes');
+  const expiryDate  = getVal('f-expiry');
 
   if (!name)   { showToast('Please enter a store name'); return; }
   if (!number) { showToast('Please enter an item number'); return; }
@@ -348,11 +352,11 @@ export async function saveCard(): Promise<void> {
   if (editMode && currentCardId) {
     const existing = getCards().find(c => c.id === currentCardId);
     if (existing) {
-      updateCard(touchCard({ ...existing, name, number, format, category, notes, color: selectedColor, emoji: selectedEmoji }));
+      updateCard(touchCard({ ...existing, name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
       showToast('Item updated!');
     }
   } else {
-    addCard(makeCard({ name, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
+    addCard(makeCard({ name, productName, brand, number, format, category, notes, expiryDate, color: selectedColor, emoji: selectedEmoji }));
     showToast('Item added! 🎉');
   }
 

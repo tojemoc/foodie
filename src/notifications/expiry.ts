@@ -16,7 +16,7 @@ export function notifyExpiring(cards: Card[]): void {
     .map(x => ({ card: x.card, date: x.date as Date }))
     .filter(x => {
       const days = Math.floor((x.date.getTime() - today.getTime()) / 86_400_000);
-      return days <= 3;
+      return days >= 0 && days <= 3;
     })
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 

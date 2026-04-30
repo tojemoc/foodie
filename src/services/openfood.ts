@@ -22,19 +22,23 @@ export async function lookupBarcode(barcode: string): Promise<OpenFoodLookupResu
   const cleaned = barcode.replace(/[^\dA-Za-z]/g, '');
   if (!cleaned) return null;
 
-  const url = `${OPEN_FOOD_API}/${encodeURIComponent(cleaned)}.json`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
+  try {
+    const url = `${OPEN_FOOD_API}/${encodeURIComponent(cleaned)}.json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
 
-  const data = await res.json() as OpenFoodResponse;
-  if (data.status !== 1 || !data.product) return null;
+    const data = await res.json() as OpenFoodResponse;
+    if (data.status !== 1 || !data.product) return null;
 
-  const productName = pickNonEmpty(data.product.product_name, data.product.product_name_en);
-  const brand = pickBrand(data.product.brands);
-  const category = mapCategory(data.product.categories_tags ?? []);
+    const productName = pickNonEmpty(data.product.product_name, data.product.product_name_en);
+    const brand = pickBrand(data.product.brands);
+    const category = mapCategory(data.product.categories_tags ?? []);
 
-  if (!productName && !brand && !category) return null;
-  return { productName, brand, category };
+    if (!productName && !brand && !category) return null;
+    return { productName, brand, category };
+  } catch {
+    return null;
+  }
 }
 
 function pickNonEmpty(...vals: Array<string | undefined>): string | undefined {
@@ -56,5 +60,5 @@ function mapCategory(tags: string[]): string | undefined {
   if (joined.includes('beverage') || joined.includes('coffee') || joined.includes('drink')) return 'coffee';
   if (joined.includes('pharmacy') || joined.includes('medicine') || joined.includes('supplement')) return 'pharmacy';
   if (joined.includes('cosmetic') || joined.includes('fashion')) return 'fashion';
-  return 'grocery';
+  return undefined;
 }
