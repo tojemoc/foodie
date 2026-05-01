@@ -18,7 +18,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: lts/*
 
       - name: Install worker deps
         working-directory: worker
@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: lts/*
 
       - name: Install frontend deps
         run: npm ci --legacy-peer-deps
