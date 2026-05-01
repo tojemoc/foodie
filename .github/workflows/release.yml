@@ -1,27 +1,53 @@
-name: Release to Production
+name: Deploy to production
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - 'v*'   # triggers on v2.1.0, v2.2.0, etc.
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
 
 jobs:
-  deploy-frontend-production:
+  deploy-worker-production:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    name: Deploy Frontend (production)
+    name: Deploy Worker (production)
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Fetch full history so we can resolve which branch the tag is on
-          fetch-depth: 0
-          # Check out main explicitly — tag pushes otherwise leave the
-          # repo in detached HEAD, which Cloudflare Pages sees as "HEAD"
-          # instead of "main" and fails the production branch check.
-          ref: main
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: lts/*
+
+      - name: Install worker deps
+        working-directory: worker
+        run: npm ci
+
+      - name: Type-check worker
+        working-directory: worker
+        run: npm run type-check
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: latest
+          apiToken:         ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId:        ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          # Deploys to a production environment defined in wrangler.toml
+          command:          deploy --env production
+
+  deploy-frontend-production:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: Deploy Frontend (production)
+    needs: deploy-worker-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
 
       - name: Install frontend deps
         run: npm ci --legacy-peer-deps
@@ -32,7 +58,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: https://foodie-api.tojemoc.workers.dev
 
       - name: Deploy to Cloudflare Pages (production)
         uses: cloudflare/wrangler-action@v3
@@ -41,9 +67,5 @@ jobs:
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command:   pages deploy ../dist --project-name=foodie-prod --branch=main
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+          # Deploys to the production Pages project (separate from production)
+          command:   pages deploy ../dist --project-name=foodie-production --branch=main
