@@ -560,13 +560,49 @@ function cap(s: string): string {
 }
 
 function formatTileExpiry(c: Card): string {
-  if (!c.expiryDate) return 'No expiry';
-  return `Expires ${c.expiryDate}`;
+  const parts = formatExpiryDisplayParts(c.expiryDate);
+  if (!parts) return 'No expiry';
+  return `Expires ${parts.nice} (${parts.rel})`;
 }
 
 function formatDetailExpiry(card: Card): string {
-  if (!card.expiryDate) return 'No expiry date set';
-  return `Expiry: ${card.expiryDate}`;
+  const parts = formatExpiryDisplayParts(card.expiryDate);
+  if (!parts) return 'No expiry date set';
+  return `Expiry: ${parts.nice} — ${parts.rel}`;
+}
+
+/** Local calendar date from YYYY-MM-DD; null if invalid. */
+function parseIsoLocalMidnight(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Whole-day offset from local today to expiry (DST-safe vs ms floor). */
+function calendarDaysUntilExpiry(iso: string): number | null {
+  const exp = parseIsoLocalMidnight(iso);
+  if (!exp) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const expDay = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+  return Math.round((expDay.getTime() - today.getTime()) / 86_400_000);
+}
+
+function formatExpiryDisplayParts(iso: string | undefined): { nice: string; rel: string } | null {
+  if (!iso) return null;
+  const d = parseIsoLocalMidnight(iso);
+  if (!d) return null;
+  const nice = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const days = calendarDaysUntilExpiry(iso);
+  if (days === null) return null;
+  let rel: string;
+  if (days === 0) rel = 'today';
+  else if (days === 1) rel = 'tomorrow';
+  else if (days === -1) rel = 'yesterday';
+  else if (days > 1) rel = `in ${days} days`;
+  else rel = `expired ${-days} day(s) ago`;
+  return { nice, rel };
 }
 
 function displayName(card: Card): string {
@@ -617,8 +653,4 @@ function addDays(days: number): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

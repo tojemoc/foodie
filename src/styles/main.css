@@ -547,6 +547,9 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   cursor: pointer; margin-bottom: 6px; -webkit-tap-highlight-color: transparent;
 }
+button.settings-item {
+  width: 100%; font: inherit; color: inherit; text-align: left;
+}
 .settings-item:active { background: var(--card-bg); }
 
 .settings-item-left  { display: flex; align-items: center; gap: 12px; }

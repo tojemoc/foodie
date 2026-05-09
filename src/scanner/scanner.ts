@@ -44,8 +44,10 @@ export async function startScan(): Promise<ScanResult> {
       video: { facingMode: 'environment', width: { ideal: 1280 } },
       audio: false,
     });
-  } catch (err) {
-    throw err;
+  } catch (err: unknown) {
+    if (err instanceof DOMException) throw err;
+    const e = err instanceof Error ? err : undefined;
+    throw new Error(`Camera access failed: ${e?.name ?? 'Unknown'}${e?.message ? `: ${e.message}` : ''}`);
   }
 
   return new Promise((resolve, reject) => {
@@ -55,11 +57,14 @@ export async function startScan(): Promise<ScanResult> {
     let animFrame: number | null          = null;
     let detector:  BarcodeDetector | null = null;
     let zxingStopped = false;
+    let zxingStop: (() => void) | null = null;
     let done = false;
 
     function cleanup() {
       done = true;
       if (animFrame !== null) cancelAnimationFrame(animFrame);
+      zxingStop?.();
+      zxingStop = null;
       stream.getTracks().forEach(t => t.stop());
       overlay.remove();
     }
@@ -88,7 +93,9 @@ export async function startScan(): Promise<ScanResult> {
       }
 
       try {
-        const result = await scanWithZxing(stream, video, () => done || zxingStopped);
+        const result = await scanWithZxing(stream, video, () => done || zxingStopped, fn => {
+          zxingStop = fn;
+        });
         if (done) return;
         cleanup();
         resolve(result);
@@ -139,9 +146,10 @@ async function scanWithZxing(
   stream: MediaStream,
   video: HTMLVideoElement,
   isDone: () => boolean,
+  registerStop: (stop: () => void) => void,
 ): Promise<ScanResult> {
-  const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser');
-  const { DecodeHintType } = await import('@zxing/library');
+  const { BrowserMultiFormatReader } = await import('@zxing/browser');
+  const { DecodeHintType, BarcodeFormat } = await import('@zxing/library');
 
   const hints = new Map();
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -181,30 +189,41 @@ async function scanWithZxing(
     }
   };
 
-  return new Promise((resolve, reject) => {
-    reader
-      .decodeFromStream(stream, video, (result, _err, controls) => {
-        if (isDone()) {
+  return new Promise<ScanResult>((resolve, reject) => {
+    void (async () => {
+      try {
+        const controls = await reader.decodeFromStream(stream, video, (result, _err, c) => {
+          if (isDone()) {
+            try {
+              c.stop();
+            } catch {
+              /* ignore */
+            }
+            return;
+          }
+          if (result) {
+            try {
+              c.stop();
+            } catch {
+              /* ignore */
+            }
+            resolve({
+              value:  result.getText(),
+              format: mapZxingFormat(result.getBarcodeFormat()),
+            });
+          }
+        });
+        registerStop(() => {
           try {
             controls.stop();
           } catch {
             /* ignore */
           }
-          return;
-        }
-        if (result) {
-          try {
-            controls.stop();
-          } catch {
-            /* ignore */
-          }
-          resolve({
-            value:  result.getText(),
-            format: mapZxingFormat(result.getBarcodeFormat()),
-          });
-        }
-      })
-      .catch(reject);
+        });
+      } catch (e) {
+        reject(e);
+      }
+    })();
   });
 }
 

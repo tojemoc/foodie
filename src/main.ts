@@ -62,7 +62,7 @@ async function bootMainApp(): Promise<void> {
   document.getElementById('main-app')!.style.display        = 'flex';
 
   renderCards();
-  notifyExpiring(loadFromLocalStorage());
+  notifyExpiring(getCards());
   await syncOnOpen();
 }
 
@@ -184,11 +184,24 @@ function requestExpiryNotificationPermission(): void {
     showToast('Notifications are not supported in this browser');
     return;
   }
-  void Notification.requestPermission().then(p => {
-    if (p === 'granted') showToast('Expiry alerts enabled — reminders appear when you open Foodie');
-    else if (p === 'denied') showToast('Notifications blocked — you can enable them in system settings');
-    else showToast('Expiry alerts stay off until you allow notifications');
-  });
+  const finish = (p: NotificationPermission) => {
+    if (p === 'granted') {
+      notifyExpiring(getCards());
+      showToast('Expiry alerts enabled — reminders appear when you open Foodie');
+    } else if (p === 'denied') {
+      showToast('Notifications blocked — you can enable them in system settings');
+    } else {
+      showToast('Expiry alerts stay off until you allow notifications');
+    }
+  };
+
+  if (Notification.permission === 'granted') {
+    notifyExpiring(getCards());
+    showToast('Checking expiry reminders…');
+    return;
+  }
+
+  void Notification.requestPermission().then(finish);
 }
 
 // ── Run ───────────────────────────────────────────────────────────────────────

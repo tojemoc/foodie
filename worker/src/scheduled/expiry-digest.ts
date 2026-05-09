@@ -2,7 +2,8 @@ import type { Env, User, Card } from '../types.js';
 import { getCards as kvGetCards } from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
 
-const DIGEST_DAYS = 3;
+/** Max inclusive day offset from UTC "today" (0 = today). Spans `DIGEST_DAYS + 1` calendar days. */
+const DIGEST_DAYS = 2;
 
 /**
  * Daily cron: email each user a list of items expiring within the next few days.
@@ -37,7 +38,7 @@ export async function runExpiryDigest(env: Env): Promise<void> {
         to:        user.email,
         fromEmail: env.EMAIL_FROM      || 'foodie@tjm.sk',
         fromName:  env.EMAIL_FROM_NAME || 'Foodie',
-        subject:   `Foodie — ${expiring.length} item(s) expiring in the next ${DIGEST_DAYS} days`,
+        subject:   `Foodie — ${expiring.length} item(s) expiring in the next ${DIGEST_DAYS + 1} days`,
         html,
       });
 
@@ -96,7 +97,7 @@ function buildDigestHtml(
     <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:28px 20px;background:#fafafa">
       <h1 style="font-size:22px;font-weight:700;margin:0 0 8px;color:#0a0a0f">Expiring soon</h1>
       <p style="color:#555;margin:0 0 20px;line-height:1.5">
-        Here are items in your Foodie list expiring in the next <strong>${DIGEST_DAYS}</strong> days (including today).
+        Here are items in your Foodie list expiring in the next <strong>${DIGEST_DAYS + 1}</strong> calendar days (including today).
       </p>
       <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <thead>
