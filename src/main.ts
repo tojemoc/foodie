@@ -1,6 +1,6 @@
 import { loadSession, saveSession, clearSession, getSession } from './auth/session.js';
 import { syncOnOpen }                from './cards/sync.js';
-import { loadFromLocalStorage }     from './cards/store.js';
+import { loadFromLocalStorage, getCards } from './cards/store.js';
 import {
   showPanel, showAuthScreen, handleRegister,
   handleLogin, handleMagicSend, handleMagicVerify,
@@ -10,7 +10,7 @@ import {
   openAddSheet, openEditSheet, saveCard, deleteCurrentCard,
   handleNumberInput, nextWizardStep, prevWizardStep, applyFreshTemplate, buildPlacementChips,
   exportCards, importCards, openSheet, closeSheet,
-  closeOnBackdrop, showPage, toggleSearch, switchBarcodeView,
+  closeOnBackdrop, showPage, toggleSearch,
 } from './ui/cards.js';
 import { showToast }                from './ui/toast.js';
 import { notifyExpiring }            from './notifications/expiry.js';
@@ -20,6 +20,8 @@ import { notifyExpiring }            from './notifications/expiry.js';
 async function init(): Promise<void> {
   buildPlacementChips();
   loadFromLocalStorage();
+
+  showStandaloneAuthHint();
 
   // 1. Check for ?magic= token first
   const magicResult = await handleMagicVerify();
@@ -148,9 +150,7 @@ function wire(): void {
   on('edit-card-btn',    'click', () => openEditSheet());
   on('delete-card-btn',  'click', () => deleteCurrentCard());
 
-  // Barcode view toggle
-  on('btn-barcode', 'click', () => switchBarcodeView('barcode'));
-  on('btn-qr',      'click', () => switchBarcodeView('qr'));
+  on('enable-expiry-notifications', 'click', () => requestExpiryNotificationPermission());
 
   // Settings
   on('export-btn',  'click', () => exportCards());
@@ -166,6 +166,29 @@ function on(id: string, event: string, handler: (e: Event) => void): void {
 function setText(id: string, val: string): void {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
+}
+
+/** iOS / Safari: home-screen web apps use separate storage from the browser tab — log in inside the app you use. */
+function showStandaloneAuthHint(): void {
+  const el = document.getElementById('auth-pwa-hint');
+  if (!el) return;
+  const standalone =
+    (window.matchMedia?.('(display-mode: standalone)')?.matches ?? false) ||
+    // iOS Safari home-screen
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  el.style.display = standalone ? 'block' : 'none';
+}
+
+function requestExpiryNotificationPermission(): void {
+  if (typeof Notification === 'undefined') {
+    showToast('Notifications are not supported in this browser');
+    return;
+  }
+  void Notification.requestPermission().then(p => {
+    if (p === 'granted') showToast('Expiry alerts enabled — reminders appear when you open Foodie');
+    else if (p === 'denied') showToast('Notifications blocked — you can enable them in system settings');
+    else showToast('Expiry alerts stay off until you allow notifications');
+  });
 }
 
 // ── Run ───────────────────────────────────────────────────────────────────────
@@ -192,7 +215,9 @@ function syncIfSession(): void {
 
 // Page becomes visible again (tab switch, app resume on mobile)
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') syncIfSession();
+  if (document.visibilityState !== 'visible') return;
+  syncIfSession();
+  if (getSession()) notifyExpiring(getCards());
 });
 
 // Device comes back online after being offline

@@ -1,11 +1,11 @@
 import type { Env }              from '../types.js';
 import { jsonResponse }          from '../lib/http.js';
 import { generateRandomToken }   from '../lib/encoding.js';
+import { sendBrevoEmail }        from '../lib/brevo.js';
 import { upsertUserByEmail, getUser, putMagicLink, getAndDeleteMagicLink } from '../lib/kv.js';
 import { issueToken }            from './jwt.js';
 
-const MAGIC_TTL_MS      = 15 * 60 * 1_000; // 15 minutes
-const MAGIC_TTL_SECONDS = 900;
+const MAGIC_TTL_MS = 15 * 60 * 1_000; // 15 minutes
 
 // ── Send ──────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,10 @@ export async function magicSend(request: Request, env: Env): Promise<Response> {
   const requestOrigin = request.headers.get('Origin');
   const origin        = requestOrigin || env.FRONTEND_ORIGIN || 'https://vibecoded-stocard.pages.dev';
   const magicUrl      = `${origin}/?magic=${token}`;
+
+  if (!env.BREVO_API_KEY) {
+    return jsonResponse({ error: 'Magic link email is not configured (BREVO_API_KEY).' }, 503, env);
+  }
 
   const result = await sendBrevoEmail({
     apiKey:    env.BREVO_API_KEY,
@@ -57,35 +61,6 @@ export async function magicVerify(request: Request, env: Env): Promise<Response>
 
   const jwtToken = await issueToken(data.userId, env);
   return jsonResponse({ token: jwtToken, userId: data.userId, username: user.username }, 200, env);
-}
-
-// ── Brevo helper ──────────────────────────────────────────────────────────────
-
-interface BrevoOptions {
-  apiKey:    string;
-  to:        string;
-  fromEmail: string;
-  fromName:  string;
-  subject:   string;
-  html:      string;
-}
-
-async function sendBrevoEmail(opts: BrevoOptions): Promise<{ ok: boolean; body: string }> {
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method:  'POST',
-    headers: {
-      'api-key':      opts.apiKey,
-      'Content-Type': 'application/json',
-      'Accept':       'application/json',
-    },
-    body: JSON.stringify({
-      sender:      { email: opts.fromEmail, name: opts.fromName },
-      to:          [{ email: opts.to }],
-      subject:     opts.subject,
-      htmlContent: opts.html,
-    }),
-  });
-  return { ok: res.ok, body: await res.text() };
 }
 
 function buildEmailHtml(magicUrl: string): string {

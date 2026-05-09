@@ -38,6 +38,7 @@ export interface Card {
   productName?: string;
   brand?:       string;
   expiryDate?:  string; // YYYY-MM-DD
+  placement?:   string;
   color:     string;
   emoji:     string;
   createdAt: string;
@@ -55,7 +56,7 @@ export interface Tombstone {
 export interface Env {
   FOODIE_KV:       KVNamespace;
   JWT_SECRET:      string;
-  BREVO_API_KEY:   string;
+  BREVO_API_KEY?:  string;
   FRONTEND_ORIGIN: string;
   FRONTEND_RP_ID:  string;
   EMAIL_FROM:      string;

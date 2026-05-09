@@ -1,9 +1,8 @@
 import type { Card }                    from '../types.js';
 import { getCards, addCard, updateCard, removeCard, makeCard, touchCard } from '../cards/store.js';
 import { pushToRemote }                from '../cards/sync.js';
-import { renderBarcode, renderQR }     from './barcode.js';
 import { showToast }                   from './toast.js';
-import { isSupported, startScan }      from '../scanner/scanner.js';
+import { isScanCameraSupported, startScan } from '../scanner/scanner.js';
 import { lookupBarcode }               from '../services/openfood.js';
 import { captureAndReadExpiryDate, isExpiryOcrSupported } from '../scanner/expiry.js';
 import { notifyExpiring } from '../notifications/expiry.js';
@@ -47,7 +46,6 @@ const FRESH_ITEM_TEMPLATES: Record<string, { name: string; brand?: string; place
 
 let currentCardId: string | null = null;
 let currentFilter = 'all';
-let barcodeView: 'barcode' | 'qr' = 'barcode';
 let editMode = false;
 let wizardStep = 1;
 
@@ -104,10 +102,10 @@ export function renderCards(): void {
     nameDiv.textContent = displayName(c);
     contentDiv.appendChild(nameDiv);
 
-    const numberDiv = document.createElement('div');
-    numberDiv.className = 'card-tile-number';
-    numberDiv.textContent = c.number;
-    contentDiv.appendChild(numberDiv);
+    const expiryDiv = document.createElement('div');
+    expiryDiv.className = 'card-tile-meta';
+    expiryDiv.textContent = formatTileExpiry(c);
+    contentDiv.appendChild(expiryDiv);
 
     tile.appendChild(contentDiv);
 
@@ -138,60 +136,21 @@ export function openDetail(id: string): void {
   const card = getCards().find(c => c.id === id);
   if (!card) return;
   currentCardId = id;
-  barcodeView = card.format === 'QR' ? 'qr' : 'barcode';
 
-  setText('detail-icon',           placementEmoji(getPlacement(card)));
-  setText('detail-name',           displayName(card));
-  setText('detail-sub',            getPlacement(card));
-  setText('detail-points',         card.brand ?? '');
-  setText('detail-barcode-number', card.number);
-  setText('detail-expiry',         card.expiryDate ? `Expiry: ${card.expiryDate}` : '');
+  setText('detail-icon',   placementEmoji(getPlacement(card)));
+  setText('detail-name',   displayName(card));
+  setText('detail-sub',    getPlacement(card));
+  setText('detail-points', card.brand ?? '');
+  setText('detail-expiry', formatDetailExpiry(card));
 
   const hdr = document.getElementById('detail-card-header');
   if (hdr) hdr.style.background = card.color;
 
-  const hint = document.getElementById('brightness-hint');
-  if (hint) hint.style.display = 'block';
-
   openSheet('detail-overlay');
-  setTimeout(() => renderDetailBarcode(card), 50);
 
   if ('wakeLock' in navigator) {
     (navigator as Navigator & { wakeLock: { request: (t: string) => Promise<unknown> } })
       .wakeLock.request('screen').catch(() => {});
-  }
-}
-
-export function switchBarcodeView(view: 'barcode' | 'qr'): void {
-  barcodeView = view;
-  const card = getCards().find(c => c.id === currentCardId);
-  if (card) renderDetailBarcode(card);
-}
-
-function renderDetailBarcode(card: Card): void {
-  const barcodeContainer = document.getElementById('barcode-container');
-  const qrContainer      = document.getElementById('qr-container');
-  const btnBarcode       = document.getElementById('btn-barcode');
-  const btnQr            = document.getElementById('btn-qr');
-  if (!barcodeContainer || !qrContainer) return;
-
-  if (barcodeView === 'qr' || card.format === 'QR') {
-    barcodeContainer.style.display = 'none';
-    qrContainer.style.display      = 'block';
-    btnBarcode?.classList.remove('active');
-    btnQr?.classList.add('active');
-    renderQR('qr-container', card.number);
-  } else {
-    barcodeContainer.style.display = 'block';
-    qrContainer.style.display      = 'none';
-    btnBarcode?.classList.add('active');
-    btnQr?.classList.remove('active');
-    const svg = document.getElementById('barcode-svg');
-    if (svg) svg.innerHTML = '';
-    if (!renderBarcode('barcode-svg', card.number, card.format)) {
-      barcodeContainer.innerHTML =
-        '<p style="color:#999;font-size:13px;text-align:center;padding:20px">Could not render — switch to QR.</p>';
-    }
   }
 }
 
@@ -231,11 +190,10 @@ export function openAddSheet(prefill?: Card): void {
   openSheet('add-overlay');
 }
 
-async function injectScanButton(): Promise<void> {
+function injectScanButton(): void {
   if (document.getElementById('scan-btn')) return; // already present
 
-  const supported = await isSupported();
-  if (!supported) return;
+  if (!isScanCameraSupported()) return;
 
   const input = document.getElementById('f-number') as HTMLInputElement | null;
   if (!input) return;
@@ -599,6 +557,16 @@ function getVal(id: string): string {
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatTileExpiry(c: Card): string {
+  if (!c.expiryDate) return 'No expiry';
+  return `Expires ${c.expiryDate}`;
+}
+
+function formatDetailExpiry(card: Card): string {
+  if (!card.expiryDate) return 'No expiry date set';
+  return `Expiry: ${card.expiryDate}`;
 }
 
 function displayName(card: Card): string {

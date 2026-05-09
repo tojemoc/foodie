@@ -36,9 +36,14 @@ export function notifyExpiring(cards: Card[]): void {
           ? `${first.card.name} expires today`
           : `${first.card.name} expires in ${firstDays} day(s)`;
 
-    new Notification('Foodie expiry reminder', { body });
+    // In-browser notification when the app is open (not server push). iOS may only show these while Foodie is foregrounded.
+    new Notification('Foodie — expiry reminder', {
+      body,
+      tag:  'foodie-expiry',
+      lang: 'en',
+    });
     localStorage.setItem(LAST_NOTICE_KEY, signature);
-    showToast('Expiry reminder sent');
+    showToast('Expiry reminder shown');
   };
 
   if (Notification.permission === 'granted') {

@@ -15,10 +15,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-  <!-- Barcode libs — loaded before module so globals are available -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
   <link rel="stylesheet" href="/src/styles/main.css" />
 </head>
 <body>
@@ -28,6 +24,10 @@
   <div id="auth-screen" class="auth-screen" style="display:none">
     <div class="auth-logo">Foodie<span>.</span></div>
     <div class="auth-tagline">Your food and groceries, everywhere.</div>
+    <p class="auth-pwa-hint" id="auth-pwa-hint" style="display:none">
+      <strong>Installed from the Home Screen?</strong> On iPhone, that app and Safari do not share the same saved login.
+      Use <strong>Sign in with Passkey</strong> here, or request a magic link and open it in <em>this</em> window (not the Safari tab from Mail).
+    </p>
 
     <!-- Login -->
     <div class="auth-card" id="auth-login-panel">
@@ -124,6 +124,13 @@
     <div id="page-settings" class="page">
       <div style="padding-top:8px;margin-bottom:24px"><div class="section-label">Settings</div></div>
       <div class="settings-section">
+        <h3>Reminders</h3>
+        <div class="settings-item" id="enable-expiry-notifications">
+          <div class="settings-item-left"><div class="settings-item-icon">🔔</div><div class="settings-item-text"><h4>Expiry alerts</h4><p>Allow browser notifications when items expire soon (shown when you open Foodie)</p></div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+      <div class="settings-section">
         <h3>Data</h3>
         <div class="settings-item" id="manual-sync-settings">
           <div class="settings-item-left"><div class="settings-item-icon">☁️</div><div class="settings-item-text"><h4>Sync now</h4><p>Force sync with cloud</p></div></div>
@@ -166,16 +173,8 @@
       <div><div class="card-detail-icon" id="detail-icon"></div><div class="card-detail-name" id="detail-name"></div><div class="card-detail-sub" id="detail-sub"></div></div>
       <div class="card-detail-points" id="detail-points"></div>
     </div>
-    <div class="brightness-hint" id="brightness-hint">☀️ Screen brightness raised for scanning</div>
-    <div class="barcode-section">
-      <div class="barcode-type-toggle">
-        <button class="toggle-btn active" id="btn-barcode">Barcode</button>
-        <button class="toggle-btn"        id="btn-qr">QR Code</button>
-      </div>
-      <div id="barcode-container"><svg id="barcode-svg"></svg></div>
-      <div id="qr-container" style="display:none"></div>
-      <div class="barcode-number" id="detail-barcode-number"></div>
-      <div class="barcode-expiry" id="detail-expiry"></div>
+    <div class="detail-focus-meta">
+      <div class="detail-expiry-block" id="detail-expiry"></div>
     </div>
     <div class="actions-row">
       <button class="btn btn-secondary" id="edit-card-btn">✏️ Edit</button>
