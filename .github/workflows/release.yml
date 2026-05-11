@@ -1,13 +1,9 @@
-name: Deploy to production
+name: Release to Production
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-    paths-ignore:
-      - '.github/**'
-      - '*.md'
+    tags:
+      - 'v*'   # triggers on v2.1.0, v2.2.0, etc.
 
 jobs:
   deploy-worker-production:
