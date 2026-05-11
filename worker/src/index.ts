@@ -5,8 +5,13 @@ import { magicSend, magicVerify }    from './auth/magic.js';
 import { verifyToken }               from './auth/jwt.js';
 import { getCards, setCards }        from './cards.js';
 import { getUser }                   from './lib/kv.js';
+import { runExpiryDigest }           from './scheduled/expiry-digest.js';
 
 export default {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runExpiryDigest(env));
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const requestOrigin = request.headers.get('Origin') ?? undefined;
     const cors          = corsHeaders(env, requestOrigin);

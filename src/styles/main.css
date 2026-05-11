@@ -69,7 +69,21 @@ html, body {
 }
 .auth-logo span { -webkit-text-fill-color: var(--muted); }
 
-.auth-tagline { font-size: 15px; color: var(--muted); margin-bottom: 48px; text-align: center; }
+.auth-tagline { font-size: 15px; color: var(--muted); margin-bottom: 20px; text-align: center; }
+
+.auth-pwa-hint {
+  max-width: 440px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 24px;
+  padding: 14px 18px;
+  background: rgba(124, 109, 250, 0.1);
+  border: 1px solid rgba(124, 109, 250, 0.22);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.auth-pwa-hint strong { color: var(--text); }
 
 .auth-card {
   width: 100%;
@@ -298,7 +312,7 @@ html, body {
   font-size: 20px; margin-bottom: 8px;
 }
 .card-tile-name   { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; }
-.card-tile-number { font-size: 10px; font-family: var(--font-mono); color: rgba(255,255,255,0.6); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-tile-meta { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-tile-points { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 10px; }
 
 .empty-state {
@@ -390,17 +404,19 @@ html, body {
 .card-detail-icon   { font-size: 40px; margin-bottom: 8px; }
 .card-detail-points { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85); }
 
-.barcode-section {
-  margin: 0 20px 20px; background: white; border-radius: var(--radius);
-  padding: 24px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+.detail-focus-meta {
+  margin: 0 20px 20px;
+  padding: 20px 22px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
 }
-.barcode-section svg,
-.barcode-section canvas { max-width: 100%; }
-
-.barcode-number       { font-family: var(--font-mono); font-size: 14px; color: #333; letter-spacing: 2px; }
-.barcode-type-toggle  { display: flex; gap: 8px; }
-.toggle-btn           { padding: 6px 16px; border-radius: 20px; border: 1px solid #ccc; background: transparent; font-size: 12px; cursor: pointer; font-family: var(--font-body); }
-.toggle-btn.active    { background: #111; color: white; border-color: #111; }
+.detail-expiry-block {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
 
 .actions-row { display: flex; gap: 10px; padding: 0 20px; }
 
@@ -530,6 +546,9 @@ html, body {
   border-radius: var(--radius-sm); padding: 16px;
   display: flex; align-items: center; justify-content: space-between;
   cursor: pointer; margin-bottom: 6px; -webkit-tap-highlight-color: transparent;
+}
+button.settings-item {
+  width: 100%; font: inherit; color: inherit; text-align: left;
 }
 .settings-item:active { background: var(--card-bg); }
 

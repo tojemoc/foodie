@@ -1,12 +1,6 @@
 /**
- * Camera barcode scanner using the BarcodeDetector API.
- *
- * Works on Chrome Android 9+ and Chrome desktop.
- * No fallback library needed — target platform (Android Chrome) has full support.
- *
- * Usage:
- *   const result = await startScan();   // opens overlay, resolves on first scan
- *   // result.value, result.format
+ * Camera barcode scanner: native BarcodeDetector when available (Chrome),
+ * ZXing-based fallback for Safari / iOS where BarcodeDetector is missing or unreliable.
  */
 
 export interface ScanResult {
@@ -14,7 +8,6 @@ export interface ScanResult {
   format: string;
 }
 
-// BarcodeDetector is not yet in the standard TypeScript lib, declare it here.
 interface BarcodeDetectorOptions {
   formats?: string[];
 }
@@ -30,89 +23,107 @@ declare class BarcodeDetector {
   static getSupportedFormats(): Promise<string[]>;
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+/** True when the device can request a camera stream (barcode scan button should appear). */
+export function isScanCameraSupported(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+}
 
-/** Returns true if BarcodeDetector is available in this browser. */
+/** @deprecated Use isScanCameraSupported — kept for callers that still await a Promise. */
 export async function isSupported(): Promise<boolean> {
-  return 'BarcodeDetector' in window;
+  return isScanCameraSupported();
 }
 
 /**
  * Open the camera overlay and scan.
- *
- * Camera permission is requested FIRST — before the overlay is shown.
- * This means the browser prompt fires immediately when the user taps the
- * scan button, which is the natural moment they expect to grant access.
- *
- * If permission is denied, rejects with a NotAllowedError without ever
- * showing the overlay.
+ * Camera permission is requested before the overlay is shown.
  */
 export async function startScan(): Promise<ScanResult> {
-  // 1. Acquire stream (triggers permission prompt) before touching the DOM
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 1280 } },
       audio: false,
     });
-  } catch (err) {
-    // Re-throw as-is — NotAllowedError, NotFoundError, etc.
-    // The caller (handleScan) shows the appropriate toast.
-    throw err;
+  } catch (err: unknown) {
+    if (err instanceof DOMException) throw err;
+    const e = err instanceof Error ? err : undefined;
+    throw new Error(`Camera access failed: ${e?.name ?? 'Unknown'}${e?.message ? `: ${e.message}` : ''}`);
   }
 
-  // 2. Permission granted — now build and show the overlay
   return new Promise((resolve, reject) => {
     const overlay = buildOverlay();
     document.body.appendChild(overlay);
 
     let animFrame: number | null          = null;
     let detector:  BarcodeDetector | null = null;
+    let zxingStopped = false;
+    let zxingStop: (() => void) | null = null;
     let done = false;
 
     function cleanup() {
       done = true;
       if (animFrame !== null) cancelAnimationFrame(animFrame);
+      zxingStop?.();
+      zxingStop = null;
       stream.getTracks().forEach(t => t.stop());
       overlay.remove();
     }
 
-    overlay.querySelector<HTMLButtonElement>('#scanner-cancel')!
-      .addEventListener('click', () => {
-        cleanup();
-        reject(new DOMException('Scan cancelled by user', 'AbortError'));
-      });
+    overlay.querySelector<HTMLButtonElement>('#scanner-cancel')!.addEventListener('click', () => {
+      zxingStopped = true;
+      cleanup();
+      reject(new DOMException('Scan cancelled by user', 'AbortError'));
+    });
 
     async function init() {
+      const video = overlay.querySelector<HTMLVideoElement>('#scanner-video')!;
+      video.srcObject = stream;
+      await video.play();
+
+      const tryNative = typeof BarcodeDetector !== 'undefined';
+      if (tryNative) {
+        try {
+          const formats = await BarcodeDetector.getSupportedFormats();
+          detector = new BarcodeDetector({ formats });
+          scanLoopNative(video, resolve, () => done);
+          return;
+        } catch {
+          detector = null;
+        }
+      }
+
       try {
-        const formats = await BarcodeDetector.getSupportedFormats();
-        detector = new BarcodeDetector({ formats });
-
-        const video = overlay.querySelector<HTMLVideoElement>('#scanner-video')!;
-        video.srcObject = stream;
-        await video.play();
-
-        scanLoop(video);
+        const result = await scanWithZxing(stream, video, () => done || zxingStopped, fn => {
+          zxingStop = fn;
+        });
+        if (done) return;
+        cleanup();
+        resolve(result);
       } catch (err) {
+        if (done) return;
         cleanup();
         reject(err);
       }
     }
 
-    function scanLoop(video: HTMLVideoElement) {
-      if (done) return;
+    function scanLoopNative(
+      video: HTMLVideoElement,
+      onHit: (r: ScanResult) => void,
+      isDone: () => boolean,
+    ) {
+      if (isDone() || !detector) return;
 
       animFrame = requestAnimationFrame(async () => {
-        if (done || !detector) return;
+        if (isDone() || !detector) return;
 
         try {
           const results = await detector.detect(video);
           if (results.length > 0) {
             const hit = results[0]!;
             cleanup();
-            resolve({
+            onHit({
               value:  hit.rawValue,
-              format: normaliseFormat(hit.format),
+              format: normaliseDetectorFormat(hit.format),
             });
             return;
           }
@@ -120,15 +131,103 @@ export async function startScan(): Promise<ScanResult> {
           // Frame decode errors are normal — keep looping
         }
 
-        scanLoop(video);
+        scanLoopNative(video, onHit, isDone);
       });
     }
 
-    init();
+    init().catch(err => {
+      cleanup();
+      reject(err);
+    });
   });
 }
 
-// ── Overlay DOM ───────────────────────────────────────────────────────────────
+async function scanWithZxing(
+  stream: MediaStream,
+  video: HTMLVideoElement,
+  isDone: () => boolean,
+  registerStop: (stop: () => void) => void,
+): Promise<ScanResult> {
+  const { BrowserMultiFormatReader } = await import('@zxing/browser');
+  const { DecodeHintType, BarcodeFormat } = await import('@zxing/library');
+
+  const hints = new Map();
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.ITF,
+    BarcodeFormat.QR_CODE,
+    BarcodeFormat.DATA_MATRIX,
+  ]);
+
+  const reader = new BrowserMultiFormatReader(hints);
+
+  const mapZxingFormat = (fmt: number): string => {
+    switch (fmt) {
+      case BarcodeFormat.EAN_13:
+        return 'EAN13';
+      case BarcodeFormat.EAN_8:
+        return 'EAN8';
+      case BarcodeFormat.UPC_A:
+      case BarcodeFormat.UPC_E:
+        return 'UPC';
+      case BarcodeFormat.CODE_128:
+        return 'CODE128';
+      case BarcodeFormat.CODE_39:
+        return 'CODE39';
+      case BarcodeFormat.ITF:
+        return 'ITF14';
+      case BarcodeFormat.QR_CODE:
+      case BarcodeFormat.DATA_MATRIX:
+        return 'QR';
+      default:
+        return 'CODE128';
+    }
+  };
+
+  return new Promise<ScanResult>((resolve, reject) => {
+    void (async () => {
+      try {
+        const controls = await reader.decodeFromStream(stream, video, (result, _err, c) => {
+          if (isDone()) {
+            try {
+              c.stop();
+            } catch {
+              /* ignore */
+            }
+            return;
+          }
+          if (result) {
+            try {
+              c.stop();
+            } catch {
+              /* ignore */
+            }
+            resolve({
+              value:  result.getText(),
+              format: mapZxingFormat(result.getBarcodeFormat()),
+            });
+          }
+        });
+        registerStop(() => {
+          try {
+            controls.stop();
+          } catch {
+            /* ignore */
+          }
+        });
+      } catch (e) {
+        reject(e);
+      }
+    })();
+  });
+}
+
+// ── Overlay DOM ────────────────────────────────────────────────────────────────
 
 function buildOverlay(): HTMLElement {
   const el = document.createElement('div');
@@ -154,7 +253,6 @@ function buildOverlay(): HTMLElement {
     </div>
   `;
 
-  // Inject scoped styles — avoids touching index.html
   const style = document.createElement('style');
   style.textContent = `
     #scanner-overlay {
@@ -246,23 +344,17 @@ function buildOverlay(): HTMLElement {
   return el;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Map BarcodeDetector format strings to the format names used by JsBarcode /
- * the app's card model so the format select pre-fills correctly.
- */
-function normaliseFormat(raw: string): string {
+function normaliseDetectorFormat(raw: string): string {
   const map: Record<string, string> = {
-    'ean_13':   'EAN13',
-    'ean_8':    'EAN8',
-    'upc_a':    'UPC',
-    'upc_e':    'UPC',
-    'code_128': 'CODE128',
-    'code_39':  'CODE39',
-    'itf':      'ITF14',
-    'qr_code':  'QR',
-    'data_matrix': 'QR', // treat as QR for display purposes
+    'ean_13':      'EAN13',
+    'ean_8':       'EAN8',
+    'upc_a':       'UPC',
+    'upc_e':       'UPC',
+    'code_128':    'CODE128',
+    'code_39':     'CODE39',
+    'itf':         'ITF14',
+    'qr_code':     'QR',
+    'data_matrix': 'QR',
   };
   return map[raw.toLowerCase()] ?? 'CODE128';
 }
