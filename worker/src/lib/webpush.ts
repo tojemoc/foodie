@@ -189,9 +189,10 @@ async function encryptPayload(plaintext: string, p256dhB64: string, authB64: str
   const exportedPub = await crypto.subtle.exportKey('raw', ephemeralKeyPair.publicKey);
   const ephemeralPublicKeyRaw = new Uint8Array(exportedPub as ArrayBuffer);
 
-  // Workers types spell the ECDH peer key as `$public` (reserved-word workaround).
+  // Workers TS types spell the peer key as `$public`; the runtime Web Crypto
+  // API still expects the standard `public` field (same as vmp's webpush.ts).
   const sharedSecretBits = await crypto.subtle.deriveBits(
-    { name: 'ECDH', $public: subscriberPublicKey },
+    { name: 'ECDH', public: subscriberPublicKey } as SubtleCryptoDeriveKeyAlgorithm,
     ephemeralKeyPair.privateKey,
     256,
   );
