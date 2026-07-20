@@ -38,7 +38,7 @@ export function notifyExpiring(cards: Card[]): void {
           ? `${name} expires today`
           : `${name} expires in ${firstDays} day(s)`;
 
-    // In-browser notification when the app is open (not server push). iOS may only show these while Foodie is foregrounded.
+    // In-browser notification when the app is open. Background delivery uses Web Push (see notifications/push.ts + Worker cron).
     new Notification('Foodie — expiry reminder', {
       body,
       tag:  'foodie-expiry',

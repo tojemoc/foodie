@@ -54,13 +54,17 @@ export interface Tombstone {
 // ── Worker env bindings ───────────────────────────────────────────────────────
 
 export interface Env {
-  FOODIE_KV:       KVNamespace;
-  JWT_SECRET:      string;
-  BREVO_API_KEY?:  string;
-  FRONTEND_ORIGIN: string;
-  FRONTEND_RP_ID:  string;
-  EMAIL_FROM:      string;
-  EMAIL_FROM_NAME: string;
+  FOODIE_KV:           KVNamespace;
+  JWT_SECRET:          string;
+  BREVO_API_KEY?:      string;
+  /** base64url uncompressed P-256 public key (safe to expose to clients). */
+  VAPID_PUBLIC_KEY?:   string;
+  /** base64url raw 32-byte P-256 private key (secret). */
+  VAPID_PRIVATE_KEY?:  string;
+  FRONTEND_ORIGIN:     string;
+  FRONTEND_RP_ID:      string;
+  EMAIL_FROM:          string;
+  EMAIL_FROM_NAME:     string;
 }
 
 // ── API response shapes ───────────────────────────────────────────────────────

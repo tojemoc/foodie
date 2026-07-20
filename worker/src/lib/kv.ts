@@ -58,6 +58,24 @@ export const getCards = (env: Env, userId: string) =>
 export const putCards = (env: Env, userId: string, cards: Card[]) =>
   env.FOODIE_KV.put(`cards:${userId}`, JSON.stringify(cards));
 
+// ── Web Push subscriptions ────────────────────────────────────────────────────
+
+export interface StoredPushSubscription {
+  endpoint:  string;
+  p256dh:    string;
+  auth:      string;
+  createdAt: string;
+}
+
+export const getPushSubscriptions = (env: Env, userId: string) =>
+  env.FOODIE_KV.get<StoredPushSubscription[]>(`pushsub:${userId}`, 'json');
+
+export const putPushSubscriptions = (
+  env: Env,
+  userId: string,
+  subs: StoredPushSubscription[],
+) => env.FOODIE_KV.put(`pushsub:${userId}`, JSON.stringify(subs));
+
 // ── Tombstones ────────────────────────────────────────────────────────────────
 
 export const getTombstones = (env: Env, userId: string) =>

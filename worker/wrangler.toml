@@ -22,11 +22,19 @@ EMAIL_FROM_NAME  = "Foodie Team"
 # Secrets — set via CLI, never commit values:
 #   wrangler secret put JWT_SECRET
 #   wrangler secret put BREVO_API_KEY
+#   wrangler secret put VAPID_PRIVATE_KEY
+#
+# Web Push public key (safe to expose) — also set as a var / secret:
+#   wrangler secret put VAPID_PUBLIC_KEY
+# Or add VAPID_PUBLIC_KEY under [vars] once generated.
+# Generate a pair locally with Web Crypto (see README).
 
 # ── Staging environment ────────────────────────────────────────
 # Deploy with: wrangler deploy --env staging
 # Secrets:     wrangler secret put JWT_SECRET --env staging
 #              wrangler secret put BREVO_API_KEY --env staging
+#              wrangler secret put VAPID_PRIVATE_KEY --env staging
+#              wrangler secret put VAPID_PUBLIC_KEY --env staging
 [env.staging]
 name = "foodie-api-staging"
 
