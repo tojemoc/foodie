@@ -48,11 +48,8 @@ export const fetchVapidPublicKey = () =>
 
 export const registerPushSubscription = (body: {
   endpoint: string;
-  keys: { p256dh?: string; auth?: string };
+  keys: { p256dh: string; auth: string };
 }) => request<{ ok?: boolean; error?: string }>('/push/subscribe', 'POST', body);
-
-export const unregisterPushSubscription = (endpoint: string) =>
-  request<{ ok?: boolean; error?: string }>('/push/subscribe', 'DELETE', { endpoint });
 
 // ── WebAuthn JSON types (not yet in all TS libs) ──────────────────────────────
 // These mirror the browser API shapes but as plain JSON (serialised over the wire).

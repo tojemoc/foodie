@@ -59,6 +59,8 @@ export const putCards = (env: Env, userId: string, cards: Card[]) =>
   env.FOODIE_KV.put(`cards:${userId}`, JSON.stringify(cards));
 
 // ── Web Push subscriptions ────────────────────────────────────────────────────
+// One KV record per endpoint: `pushsub:{userId}:{endpointHash}` — avoids
+// read-modify-write races across devices updating different subscriptions.
 
 export interface StoredPushSubscription {
   endpoint:  string;
@@ -67,14 +69,55 @@ export interface StoredPushSubscription {
   createdAt: string;
 }
 
-export const getPushSubscriptions = (env: Env, userId: string) =>
-  env.FOODIE_KV.get<StoredPushSubscription[]>(`pushsub:${userId}`, 'json');
+async function endpointKeyHash(endpoint: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
+  return [...new Uint8Array(digest)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32);
+}
 
-export const putPushSubscriptions = (
+function pushSubKey(userId: string, endpointHash: string): string {
+  return `pushsub:${userId}:${endpointHash}`;
+}
+
+export async function getPushSubscriptions(
   env: Env,
   userId: string,
-  subs: StoredPushSubscription[],
-) => env.FOODIE_KV.put(`pushsub:${userId}`, JSON.stringify(subs));
+): Promise<StoredPushSubscription[]> {
+  const prefix = `pushsub:${userId}:`;
+  const out: StoredPushSubscription[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const list = await env.FOODIE_KV.list({ prefix, cursor });
+    for (const { name } of list.keys) {
+      const sub = await env.FOODIE_KV.get<StoredPushSubscription>(name, 'json');
+      if (sub?.endpoint && sub.p256dh && sub.auth) out.push(sub);
+    }
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+
+  return out;
+}
+
+export async function putPushSubscription(
+  env: Env,
+  userId: string,
+  sub: StoredPushSubscription,
+): Promise<void> {
+  const hash = await endpointKeyHash(sub.endpoint);
+  await env.FOODIE_KV.put(pushSubKey(userId, hash), JSON.stringify(sub));
+}
+
+export async function deletePushSubscription(
+  env: Env,
+  userId: string,
+  endpoint: string,
+): Promise<void> {
+  const hash = await endpointKeyHash(endpoint);
+  await env.FOODIE_KV.delete(pushSubKey(userId, hash));
+}
 
 // ── Tombstones ────────────────────────────────────────────────────────────────
 

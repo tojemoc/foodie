@@ -152,7 +152,13 @@ function wire(): void {
   on('edit-card-btn',    'click', () => openEditSheet());
   on('delete-card-btn',  'click', () => deleteCurrentCard());
 
-  on('enable-expiry-notifications', 'click', () => void enableExpiryAlerts());
+  on('enable-expiry-notifications', 'click', () => {
+    if (_enableAlertsInFlight) return;
+    _enableAlertsInFlight = true;
+    void enableExpiryAlerts().finally(() => {
+      _enableAlertsInFlight = false;
+    });
+  });
 
   // Settings
   on('export-btn',  'click', () => exportCards());
@@ -181,6 +187,8 @@ function showStandaloneAuthHint(): void {
   el.style.display = standalone ? 'block' : 'none';
 }
 
+let _enableAlertsInFlight = false;
+
 async function enableExpiryAlerts(): Promise<void> {
   // Prefer Web Push (background). Falls back to in-page Notification when push is unavailable.
   if (isPushSupported() || (isIosSafari() && !isStandaloneDisplay())) {
@@ -190,7 +198,11 @@ async function enableExpiryAlerts(): Promise<void> {
       showToast('Background expiry alerts enabled ✓');
       return;
     }
-    if (result.reason.includes('Home Screen') || result.reason.includes('not supported') || result.reason.includes('not configured')) {
+    if (
+      result.code === 'ios_homescreen' ||
+      result.code === 'unsupported' ||
+      result.code === 'unconfigured'
+    ) {
       showToast(result.reason);
       // Still try foreground notifications if permission can be granted.
       if (!isPushSupported()) {

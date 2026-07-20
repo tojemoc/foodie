@@ -79,7 +79,7 @@ Cardex was **rebranded to Foodie**. Grocery flows returned on the new stack: Ope
 | Expiry-focused tiles / detail UI | Done |
 | In-app expiry notifications (on open / focus) | Done |
 | Web Push background expiry alerts (VAPID + Worker cron) | Done |
-| Daily morning digest email (Worker cron → Brevo) | Done |
+| Daily morning digest email + Web Push | Done |
 | iOS Home Screen vs Safari auth storage hint | Done |
 | PWA install (manifest + service worker via vite-plugin-pwa) | Done |
 | Staging CI/CD (Worker + Pages on `main`) | Done |

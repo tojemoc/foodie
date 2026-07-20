@@ -1,5 +1,9 @@
 import type { Env, User, Card } from '../types.js';
-import { getCards as kvGetCards, getPushSubscriptions, putPushSubscriptions } from '../lib/kv.js';
+import {
+  getCards as kvGetCards,
+  getPushSubscriptions,
+  deletePushSubscription,
+} from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
 import { sendPushNotification, PushSendError } from '../lib/webpush.js';
 
@@ -57,7 +61,7 @@ export async function runExpiryDigest(env: Env): Promise<void> {
           html,
         });
         if (result.ok) emailsSent++;
-        else console.error('expiry-digest: Brevo failed for', user.email, result.body);
+        else console.error('expiry-digest: Brevo failed for', userId, result.body);
       }
 
       if (canPush) {
@@ -74,7 +78,7 @@ export async function runExpiryDigest(env: Env): Promise<void> {
 }
 
 async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Promise<number> {
-  const subs = (await getPushSubscriptions(env, userId)) ?? [];
+  const subs = await getPushSubscriptions(env, userId);
   if (!subs.length) return 0;
 
   const first = rows[0]!;
@@ -86,7 +90,6 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
     tag:   'foodie-expiry',
   };
 
-  const keep: typeof subs = [];
   let sent = 0;
 
   for (const sub of subs) {
@@ -100,20 +103,15 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
           EMAIL_FROM:        env.EMAIL_FROM,
         },
       );
-      keep.push(sub);
       sent++;
     } catch (err) {
       if (err instanceof PushSendError && err.code === 'subscription_gone') {
         console.log('expiry-digest: pruning stale push sub for', userId);
+        await deletePushSubscription(env, userId, sub.endpoint);
         continue;
       }
       console.error('expiry-digest: push failed for', userId, err);
-      keep.push(sub);
     }
-  }
-
-  if (keep.length !== subs.length) {
-    await putPushSubscriptions(env, userId, keep);
   }
 
   return sent;
