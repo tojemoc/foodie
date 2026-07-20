@@ -19,7 +19,7 @@
     "serialize-javascript": ">=7.0.3"
   },
   "dependencies": {
-    "@zxing/browser": "^0.2.0",
+    "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "tesseract.js": "^6.0.1"
   }
