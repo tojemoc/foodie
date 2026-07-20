@@ -15,17 +15,18 @@ foodie/
 │   ├── cards/               # localStorage store, sync, LWW merge
 │   ├── scanner/             # Camera barcode + expiry OCR
 │   ├── services/            # Open Food Facts lookup
-│   ├── notifications/       # In-app expiry alerts
+│   ├── notifications/       # In-app + Web Push expiry alerts
 │   ├── ui/                  # Auth, cards, toast
 │   └── styles/
 ├── worker/                  # Cloudflare Worker (TypeScript)
 │   └── src/
 │       ├── index.ts         # Router + cron entry
 │       ├── cards.ts         # GET/POST /cards
+│       ├── push.ts          # Web Push subscribe / VAPID public key
 │       ├── auth/            # WebAuthn, magic link, JWT
-│       ├── scheduled/       # Morning expiry digest email
-│       └── lib/             # CBOR, COSE, Brevo, KV, CORS
-├── public/                  # Icons + web manifest
+│       ├── scheduled/       # Morning expiry digest (email + push)
+│       └── lib/             # CBOR, COSE, Brevo, Web Push, KV, CORS
+├── public/                  # Icons + sw-push.js (Workbox importScripts)
 ├── index.html
 └── .github/workflows/       # Staging + production deploy
 ```
@@ -46,7 +47,7 @@ Separately, a vanilla TypeScript **loyalty-card wallet** (Cardex) shipped passke
 
 ### 3. Rebrand and product features
 
-Cardex was **rebranded to Foodie**. Grocery flows returned on the new stack: Open Food Facts lookup, expiry OCR (`TextDetector` where available), a two-step add-item / placement wizard, ZXing fallback for Safari/iOS barcode scan, expiry-first UI (barcode/QR display removed), in-app expiry notifications, and a Worker cron that emails a morning digest via Brevo.
+Cardex was **rebranded to Foodie**. Grocery flows returned on the new stack: Open Food Facts lookup, expiry OCR (Tesseract.js), a two-step add-item / placement wizard, ZXing fallback for Safari/iOS barcode scan, expiry-first UI (barcode/QR display removed), in-app + Web Push expiry notifications, and a Worker cron that emails a morning digest via Brevo and can also deliver Web Push.
 
 ### Why this shape
 
@@ -74,10 +75,11 @@ Cardex was **rebranded to Foodie**. Grocery flows returned on the new stack: Ope
 | Fresh-item templates (fruit, dairy, meat, …) | Done |
 | Camera barcode scan (`BarcodeDetector` + ZXing fallback) | Done |
 | Open Food Facts product lookup | Done |
-| Expiry date OCR (`TextDetector`, Chromium) | Done |
+| Expiry date OCR (Tesseract.js, cross-browser) | Done |
 | Expiry-focused tiles / detail UI | Done |
 | In-app expiry notifications (on open / focus) | Done |
-| Daily morning digest email (Worker cron → Brevo) | Done |
+| Web Push background expiry alerts (VAPID + Worker cron) | Done |
+| Daily morning digest email + Web Push | Done |
 | iOS Home Screen vs Safari auth storage hint | Done |
 | PWA install (manifest + service worker via vite-plugin-pwa) | Done |
 | Staging CI/CD (Worker + Pages on `main`) | Done |
@@ -92,9 +94,9 @@ Near term (still PWA):
 
 - [ ] **Multi-device passkey management** — list and revoke credentials via Worker endpoints
 - [ ] **Explicit install CTA** — in-app “Add to Home Screen” affordance where the browser supports it
-- [ ] **Stronger expiry OCR** — broader browser support beyond `TextDetector` (or graceful guided manual entry)
 - [ ] **Family / shared inventories** — shared KV space or invite model on top of today’s per-user sync
 - [ ] **Production hardening** — confirm production Worker + Pages endpoints, secrets, and RP ID for real domains
+- [ ] **Vision-model OCR** — optional Worker-side LLM/vision date extract for stylized packaging (Tesseract covers the cross-browser baseline)
 
 Longer term:
 
@@ -127,11 +129,26 @@ wrangler kv:namespace create FOODIE_KV
 #   EMAIL_FROM_NAME = "Foodie"
 
 # Set secrets (never committed)
-wrangler secret put JWT_SECRET      # paste any long random string
-wrangler secret put BREVO_API_KEY   # xkeysib-... from app.brevo.com
+wrangler secret put JWT_SECRET         # paste any long random string
+wrangler secret put BREVO_API_KEY      # xkeysib-... from app.brevo.com
+wrangler secret put VAPID_PRIVATE_KEY  # base64url 32-byte P-256 private key
+wrangler secret put VAPID_PUBLIC_KEY   # base64url 65-byte uncompressed P-256 public key
 ```
 
-The Worker runs a daily cron (`0 6 * * *` UTC) that emails users about items expiring soon. Digest sending is skipped when `BREVO_API_KEY` is unset.
+Generate a VAPID key pair (Node 20+):
+
+```bash
+node --input-type=module -e "
+const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+const raw = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+const b64 = (u8) => Buffer.from(u8).toString('base64').replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');
+console.log('VAPID_PUBLIC_KEY=' + b64(raw));
+console.log('VAPID_PRIVATE_KEY=' + jwk.d);
+"
+```
+
+The Worker runs a daily cron (`0 6 * * *` UTC) that emails users about items expiring soon **and** sends Web Push to stored subscriptions (`pushsub:{userId}`). Email is skipped when `BREVO_API_KEY` is unset; push is skipped when VAPID keys are unset.
 
 ---
 

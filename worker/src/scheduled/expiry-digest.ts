@@ -1,23 +1,39 @@
 import type { Env, User, Card } from '../types.js';
-import { getCards as kvGetCards } from '../lib/kv.js';
+import {
+  getCards as kvGetCards,
+  getPushSubscriptions,
+  deletePushSubscription,
+} from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
+import { sendPushNotification, PushSendError } from '../lib/webpush.js';
 
 /** Max inclusive day offset from UTC "today" (0 = today). Spans `DIGEST_DAYS + 1` calendar days. */
 const DIGEST_DAYS = 2;
 
+interface ExpiringRow {
+  name: string;
+  expiry: string;
+  placement: string;
+}
+
 /**
- * Daily cron: email each user a list of items expiring within the next few days.
- * Requires BREVO_API_KEY. Iterates KV keys with prefix `user:`.
+ * Daily cron: email + Web Push each user a list of items expiring soon.
+ * Email requires BREVO_API_KEY; push requires VAPID keys + a stored subscription.
+ * Iterates KV keys with prefix `user:`.
  */
 export async function runExpiryDigest(env: Env): Promise<void> {
-  if (!env.BREVO_API_KEY) {
-    console.warn('expiry-digest: BREVO_API_KEY not set, skipping');
+  const canEmail = !!env.BREVO_API_KEY;
+  const canPush  = !!(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY);
+
+  if (!canEmail && !canPush) {
+    console.warn('expiry-digest: neither BREVO_API_KEY nor VAPID keys set, skipping');
     return;
   }
 
   let cursor: string | undefined;
   let processed = 0;
-  let sent = 0;
+  let emailsSent = 0;
+  let pushesSent = 0;
 
   do {
     const list = await env.FOODIE_KV.list({ prefix: 'user:', cursor });
@@ -32,30 +48,79 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       const expiring = filterExpiringSoon(cards);
       if (!expiring.length) continue;
 
-      const html = buildDigestHtml(expiring, env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev');
-      const result = await sendBrevoEmail({
-        apiKey:    env.BREVO_API_KEY,
-        to:        user.email,
-        fromEmail: env.EMAIL_FROM      || 'foodie@tjm.sk',
-        fromName:  env.EMAIL_FROM_NAME || 'Foodie',
-        subject:   `Foodie — ${expiring.length} item(s) expiring in the next ${DIGEST_DAYS + 1} days`,
-        html,
-      });
-
       processed++;
-      if (result.ok) sent++;
-      else console.error('expiry-digest: Brevo failed for', user.email, result.body);
+
+      if (canEmail) {
+        const html = buildDigestHtml(expiring, env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev');
+        const result = await sendBrevoEmail({
+          apiKey:    env.BREVO_API_KEY!,
+          to:        user.email,
+          fromEmail: env.EMAIL_FROM      || 'foodie@tjm.sk',
+          fromName:  env.EMAIL_FROM_NAME || 'Foodie',
+          subject:   `Foodie — ${expiring.length} item(s) expiring in the next ${DIGEST_DAYS + 1} days`,
+          html,
+        });
+        if (result.ok) emailsSent++;
+        else console.error('expiry-digest: Brevo failed for', userId, result.body);
+      }
+
+      if (canPush) {
+        const n = await sendExpiryPush(env, userId, expiring);
+        pushesSent += n;
+      }
     }
     cursor = list.list_complete ? undefined : list.cursor;
   } while (cursor);
 
-  console.log(`expiry-digest: done — users checked ${processed}, emails sent ${sent}`);
+  console.log(
+    `expiry-digest: done — users with expiring items ${processed}, emails ${emailsSent}, pushes ${pushesSent}`,
+  );
 }
 
-function filterExpiringSoon(cards: Card[]): { name: string; expiry: string; placement: string }[] {
+async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Promise<number> {
+  const subs = await getPushSubscriptions(env, userId);
+  if (!subs.length) return 0;
+
+  const first = rows[0]!;
+  const more = rows.length > 1 ? ` (+${rows.length - 1} more)` : '';
+  const payload = {
+    title: 'Foodie — expiring soon',
+    body:  `${first.name} expires ${first.expiry}${more}`,
+    url:   '/',
+    tag:   'foodie-expiry',
+  };
+
+  let sent = 0;
+
+  for (const sub of subs) {
+    try {
+      await sendPushNotification(
+        { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+        payload,
+        {
+          VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY!,
+          VAPID_PUBLIC_KEY:  env.VAPID_PUBLIC_KEY!,
+          EMAIL_FROM:        env.EMAIL_FROM,
+        },
+      );
+      sent++;
+    } catch (err) {
+      if (err instanceof PushSendError && err.code === 'subscription_gone') {
+        console.log('expiry-digest: pruning stale push sub for', userId);
+        await deletePushSubscription(env, userId, sub.endpoint);
+        continue;
+      }
+      console.error('expiry-digest: push failed for', userId, err);
+    }
+  }
+
+  return sent;
+}
+
+function filterExpiringSoon(cards: Card[]): ExpiringRow[] {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const out: { name: string; expiry: string; placement: string }[] = [];
+  const out: ExpiringRow[] = [];
 
   for (const c of cards) {
     if (!c.expiryDate) continue;
@@ -79,10 +144,7 @@ function parseIsoDateUtc(iso: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function buildDigestHtml(
-  rows: { name: string; expiry: string; placement: string }[],
-  appOrigin: string,
-): string {
+function buildDigestHtml(rows: ExpiringRow[], appOrigin: string): string {
   const rowsHtml = rows
     .map(
       r => `<tr>

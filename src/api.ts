@@ -41,6 +41,16 @@ export const authMe             = ()                  => request<{ id: string; u
 export const fetchCards = ()                                        => request<{ cards: Card[]; tombstones: Tombstone[]; error?: string }>('/cards', 'GET');
 export const pushCards  = (cards: Card[], tombstones: Tombstone[]) => request<{ ok: boolean; error?: string }>('/cards', 'POST', { cards, tombstones });
 
+// ── Web Push ──────────────────────────────────────────────────────────────────
+
+export const fetchVapidPublicKey = () =>
+  request<{ publicKey?: string; error?: string }>('/push/vapid-public-key', 'GET');
+
+export const registerPushSubscription = (body: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}) => request<{ ok?: boolean; error?: string }>('/push/subscribe', 'POST', body);
+
 // ── WebAuthn JSON types (not yet in all TS libs) ──────────────────────────────
 // These mirror the browser API shapes but as plain JSON (serialised over the wire).
 

@@ -27,6 +27,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Push handlers (public/sw-push.js) — classic importScripts, not ES module
+        importScripts: ['/sw-push.js'],
         // Cache CDN barcode libs so they work offline
         runtimeCaching: [
           {

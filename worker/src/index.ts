@@ -4,6 +4,7 @@ import { registerBegin, registerFinish, loginBegin, loginFinish } from './auth/p
 import { magicSend, magicVerify }    from './auth/magic.js';
 import { verifyToken }               from './auth/jwt.js';
 import { getCards, setCards }        from './cards.js';
+import { getVapidPublicKey, pushSubscribe, pushUnsubscribe } from './push.js';
 import { getUser }                   from './lib/kv.js';
 import { runExpiryDigest }           from './scheduled/expiry-digest.js';
 
@@ -51,6 +52,11 @@ export default {
       // ── Cards ────────────────────────────────────────────────────────────────
       else if (pathname === '/cards' && request.method === 'GET')  response = await getCards(request, env);
       else if (pathname === '/cards' && request.method === 'POST') response = await setCards(request, env);
+
+      // ── Web Push ─────────────────────────────────────────────────────────────
+      else if (pathname === '/push/vapid-public-key' && request.method === 'GET')  response = await getVapidPublicKey(request, env);
+      else if (pathname === '/push/subscribe'       && request.method === 'POST') response = await pushSubscribe(request, env);
+      else if (pathname === '/push/subscribe'       && request.method === 'DELETE') response = await pushUnsubscribe(request, env);
 
       else response = jsonResponse({ error: 'Not found' }, 404, env);
 

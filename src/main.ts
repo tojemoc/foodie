@@ -14,6 +14,7 @@ import {
 } from './ui/cards.js';
 import { showToast }                from './ui/toast.js';
 import { notifyExpiring }            from './notifications/expiry.js';
+import { enableWebPush, reconcileWebPush, isPushSupported, isIosSafari, isStandaloneDisplay } from './notifications/push.js';
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ async function bootMainApp(): Promise<void> {
   renderCards();
   notifyExpiring(getCards());
   await syncOnOpen();
+  void reconcileWebPush();
 }
 
 // ── Global event wiring ───────────────────────────────────────────────────────
@@ -150,7 +152,13 @@ function wire(): void {
   on('edit-card-btn',    'click', () => openEditSheet());
   on('delete-card-btn',  'click', () => deleteCurrentCard());
 
-  on('enable-expiry-notifications', 'click', () => requestExpiryNotificationPermission());
+  on('enable-expiry-notifications', 'click', () => {
+    if (_enableAlertsInFlight) return;
+    _enableAlertsInFlight = true;
+    void enableExpiryAlerts().finally(() => {
+      _enableAlertsInFlight = false;
+    });
+  });
 
   // Settings
   on('export-btn',  'click', () => exportCards());
@@ -179,7 +187,37 @@ function showStandaloneAuthHint(): void {
   el.style.display = standalone ? 'block' : 'none';
 }
 
-function requestExpiryNotificationPermission(): void {
+let _enableAlertsInFlight = false;
+
+async function enableExpiryAlerts(): Promise<void> {
+  // Prefer Web Push (background). Falls back to in-page Notification when push is unavailable.
+  if (isPushSupported() || (isIosSafari() && !isStandaloneDisplay())) {
+    const result = await enableWebPush();
+    if (result.ok) {
+      notifyExpiring(getCards());
+      showToast('Background expiry alerts enabled ✓');
+      return;
+    }
+    if (
+      result.code === 'ios_homescreen' ||
+      result.code === 'unsupported' ||
+      result.code === 'unconfigured'
+    ) {
+      showToast(result.reason);
+      // Still try foreground notifications if permission can be granted.
+      if (!isPushSupported()) {
+        requestForegroundNotificationPermission();
+      }
+      return;
+    }
+    showToast(result.reason);
+    return;
+  }
+
+  requestForegroundNotificationPermission();
+}
+
+function requestForegroundNotificationPermission(): void {
   if (typeof Notification === 'undefined') {
     showToast('Notifications are not supported in this browser');
     return;
