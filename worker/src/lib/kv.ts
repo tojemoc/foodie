@@ -91,8 +91,11 @@ export async function getPushSubscriptions(
 
   do {
     const list = await env.FOODIE_KV.list({ prefix, cursor });
-    for (const { name } of list.keys) {
-      const sub = await env.FOODIE_KV.get<StoredPushSubscription>(name, 'json');
+    const names = list.keys.map(k => k.name);
+    const values = await Promise.all(
+      names.map(name => env.FOODIE_KV.get<StoredPushSubscription>(name, 'json')),
+    );
+    for (const sub of values) {
       if (sub?.endpoint && sub.p256dh && sub.auth) out.push(sub);
     }
     cursor = list.list_complete ? undefined : list.cursor;

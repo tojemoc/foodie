@@ -12,6 +12,10 @@ function isPrivateIPv4(a: number, b: number): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   if (a === 169 && b === 254) return true;
+  // Carrier-Grade NAT (100.64.0.0/10)
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  // Multicast (224.0.0.0/4)
+  if (a >= 224 && a <= 239) return true;
   return false;
 }
 
@@ -55,7 +59,13 @@ function isPrivateHost(hostname: string): boolean {
   }
 
   if (h.includes(':')) {
-    if (h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('ff')) {
+    // Link-local fe80::/10 → fe8–feb; ULA fc00::/7 → fc/fd; multicast ff00::/8 → ff
+    if (
+      /^fe[89ab]/.test(h) ||
+      h.startsWith('fc') ||
+      h.startsWith('fd') ||
+      h.startsWith('ff')
+    ) {
       return true;
     }
   }
