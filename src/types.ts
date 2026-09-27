@@ -1,4 +1,4 @@
-export interface Card {
+export interface Item {
   id:        string;
   name:      string;
   number:    string;
@@ -15,9 +15,12 @@ export interface Card {
   updatedAt: string;
 }
 
-/** Records a deleted card so other devices know not to resurrect it. */
+/** @deprecated Use Item — Cardex-era alias. */
+export type Card = Item;
+
+/** Records a deleted item so other devices know not to resurrect it. */
 export interface Tombstone {
-  id:        string; // card id
+  id:        string; // item id
   deletedAt: string; // ISO timestamp
 }
 

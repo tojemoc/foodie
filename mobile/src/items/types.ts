@@ -1,5 +1,5 @@
-/** Inventory item — mirrors Worker `/cards` schema (+ native extensions). */
-export interface Card {
+/** Inventory item — mirrors Worker `/items` schema (+ native extensions). */
+export interface Item {
   id: string;
   name: string;
   number: string;
@@ -14,13 +14,15 @@ export interface Card {
   emoji: string;
   createdAt: string;
   updatedAt: string;
-  /** Native extensions (ignored by older PWA clients). */
   quantity?: number;
   unit?: string;
   imageUri?: string;
   source?: 'barcode' | 'produce' | 'manual';
   lookupSource?: string;
 }
+
+/** @deprecated Use Item */
+export type Card = Item;
 
 export interface Tombstone {
   id: string;

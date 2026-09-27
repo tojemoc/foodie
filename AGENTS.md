@@ -22,7 +22,7 @@ PWA + Expo native food / grocery tracker with passkey + magic-link auth and Clou
 
 ### Roadmap
 - GitHub Pages AltStore source hosting, ML Kit OCR in prebuild, shared inventories, prod hardening
-- Keep Worker `/cards` schema stable for all clients
+- Keep Worker `/items` schema stable for all clients (`/cards` is a legacy alias)
 
 Prefer reading `README.md` and `mobile/README.md`.
 

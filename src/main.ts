@@ -1,17 +1,17 @@
 import { loadSession, saveSession, clearSession, getSession } from './auth/session.js';
-import { syncOnOpen }                from './cards/sync.js';
-import { loadFromLocalStorage, getCards } from './cards/store.js';
+import { syncOnOpen }                from './items/sync.js';
+import { loadFromLocalStorage, getItems } from './items/store.js';
 import {
   showPanel, showAuthScreen, handleRegister,
   handleLogin, handleMagicSend, handleMagicVerify,
 } from './ui/auth.js';
 import {
-  renderCards, filterByCategory, openDetail,
-  openAddSheet, openEditSheet, saveCard, deleteCurrentCard,
+  renderItems, filterByCategory, openDetail,
+  openAddSheet, openEditSheet, saveItem, deleteCurrentItem,
   handleNumberInput, nextWizardStep, prevWizardStep, applyFreshTemplate, buildPlacementChips,
-  exportCards, importCards, openSheet, closeSheet,
+  exportItems, importItems, openSheet, closeSheet,
   closeOnBackdrop, showPage, toggleSearch,
-} from './ui/cards.js';
+} from './ui/items.js';
 import { showToast }                from './ui/toast.js';
 import { notifyExpiring }            from './notifications/expiry.js';
 import { enableWebPush, reconcileWebPush, isPushSupported, isIosSafari, isStandaloneDisplay } from './notifications/push.js';
@@ -62,8 +62,8 @@ async function bootMainApp(): Promise<void> {
   document.getElementById('magic-verifying')!.style.display = 'none';
   document.getElementById('main-app')!.style.display        = 'flex';
 
-  renderCards();
-  notifyExpiring(getCards());
+  renderItems();
+  notifyExpiring(getItems());
   await syncOnOpen();
   void reconcileWebPush();
 }
@@ -119,7 +119,7 @@ function wire(): void {
 
   // Search
   on('search-btn',   'click', () => toggleSearch());
-  on('search-input', 'input', () => renderCards());
+  on('search-input', 'input', () => renderItems());
 
   // Sync now button in settings
   on('manual-sync-settings', 'click', async () => {
@@ -148,9 +148,9 @@ function wire(): void {
   on('f-template', 'change', () => applyFreshTemplate());
   on('wizard-next-btn', 'click', () => nextWizardStep());
   on('wizard-back-btn', 'click', () => prevWizardStep());
-  on('save-card-btn',    'click', () => saveCard());
+  on('save-card-btn',    'click', () => saveItem());
   on('edit-card-btn',    'click', () => openEditSheet());
-  on('delete-card-btn',  'click', () => deleteCurrentCard());
+  on('delete-card-btn',  'click', () => deleteCurrentItem());
 
   on('enable-expiry-notifications', 'click', () => {
     if (_enableAlertsInFlight) return;
@@ -161,8 +161,8 @@ function wire(): void {
   });
 
   // Settings
-  on('export-btn',  'click', () => exportCards());
-  on('import-input','change', e => importCards(e));
+  on('export-btn',  'click', () => exportItems());
+  on('import-input','change', e => importItems(e));
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ async function enableExpiryAlerts(): Promise<void> {
   if (isPushSupported() || (isIosSafari() && !isStandaloneDisplay())) {
     const result = await enableWebPush();
     if (result.ok) {
-      notifyExpiring(getCards());
+      notifyExpiring(getItems());
       showToast('Background expiry alerts enabled ✓');
       return;
     }
@@ -224,7 +224,7 @@ function requestForegroundNotificationPermission(): void {
   }
   const finish = (p: NotificationPermission) => {
     if (p === 'granted') {
-      notifyExpiring(getCards());
+      notifyExpiring(getItems());
       showToast('Expiry alerts enabled — reminders appear when you open Foodie');
     } else if (p === 'denied') {
       showToast('Notifications blocked — you can enable them in system settings');
@@ -234,7 +234,7 @@ function requestForegroundNotificationPermission(): void {
   };
 
   if (Notification.permission === 'granted') {
-    notifyExpiring(getCards());
+    notifyExpiring(getItems());
     showToast('Checking expiry reminders…');
     return;
   }
@@ -268,7 +268,7 @@ function syncIfSession(): void {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   syncIfSession();
-  if (getSession()) notifyExpiring(getCards());
+  if (getSession()) notifyExpiring(getItems());
 });
 
 // Device comes back online after being offline

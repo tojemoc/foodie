@@ -1,8 +1,8 @@
 # Foodie mobile (Expo)
 
 React Native client for SideStore / AltStore distribution. Reuses the existing
-Cloudflare Worker API (`/cards`, magic-link auth) so inventory sync stays
-compatible with the PWA schema.
+Cloudflare Worker API (`/items`, magic-link auth) so inventory sync stays
+compatible with the PWA schema. (`/cards` remains a legacy alias.)
 
 ## Why native
 

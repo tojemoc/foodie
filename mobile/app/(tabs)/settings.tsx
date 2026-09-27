@@ -3,15 +3,15 @@ import { useRouter } from 'expo-router';
 import { Button, SectionTitle } from '../../src/components/Button';
 import { useSession } from '../../src/auth/session';
 import { API_BASE } from '../../src/api/client';
-import { syncOnOpen } from '../../src/cards/sync';
-import { getCards } from '../../src/cards/store';
+import { syncOnOpen } from '../../src/items/sync';
+import { getItems } from '../../src/items/store';
 import { PRODUCE_CATALOG } from '../../src/produce/catalog';
 import { colors, spacing } from '../../src/theme/colors';
 
 export default function SettingsScreen() {
   const { session, signOut } = useSession();
   const router = useRouter();
-  const count = getCards().length;
+  const count = getItems().length;
 
   return (
     <View style={styles.screen}>

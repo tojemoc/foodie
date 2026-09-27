@@ -1,9 +1,9 @@
-import { fetchCards, pushCards } from '../api/client';
-import { mergeCards } from './merge';
+import { fetchItems, pushItems } from '../api/client';
+import { mergeItems } from './merge';
 import {
-  getCards,
+  getItems,
   getTombstones,
-  setCards,
+  setItems,
   setTombstones,
 } from './store';
 import type { SyncStatus } from './types';
@@ -23,24 +23,24 @@ function setStatus(status: SyncStatus, message?: string): void {
 export async function syncOnOpen(): Promise<void> {
   setStatus('syncing', 'Syncing…');
   try {
-    const { cards: remoteCards, tombstones: remoteTombstones, error } = await fetchCards();
+    const { items: remoteItems, tombstones: remoteTombstones, error } = await fetchItems();
     if (error) throw new Error(error);
 
-    const { cards, tombstones } = mergeCards(
-      getCards(),
-      remoteCards ?? [],
+    const { items, tombstones } = mergeItems(
+      getItems(),
+      remoteItems ?? [],
       getTombstones(),
       remoteTombstones ?? [],
     );
 
-    setCards(cards);
+    setItems(items);
     setTombstones(tombstones);
 
-    const cardsChanged = JSON.stringify(cards) !== JSON.stringify(remoteCards ?? []);
+    const itemsChanged = JSON.stringify(items) !== JSON.stringify(remoteItems ?? []);
     const tombstonesChanged =
       JSON.stringify(tombstones) !== JSON.stringify(remoteTombstones ?? []);
 
-    if (cardsChanged || tombstonesChanged) {
+    if (itemsChanged || tombstonesChanged) {
       await pushToRemote();
     } else {
       setStatus('synced', 'Synced');
@@ -53,7 +53,7 @@ export async function syncOnOpen(): Promise<void> {
 export async function pushToRemote(): Promise<void> {
   setStatus('syncing', 'Saving…');
   try {
-    const { error } = await pushCards(getCards(), getTombstones());
+    const { error } = await pushItems(getItems(), getTombstones());
     if (error) throw new Error(error);
     setStatus('synced', 'Synced');
   } catch {

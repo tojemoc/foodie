@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { getCards, subscribe } from '../../src/cards/store';
-import { DEFAULT_PLACEMENTS } from '../../src/cards/types';
+import { getItems, subscribe } from '../../src/items/store';
+import { DEFAULT_PLACEMENTS } from '../../src/items/types';
 import { colors, spacing } from '../../src/theme/colors';
 import { useEffect, useState } from 'react';
 
@@ -11,7 +11,7 @@ export default function LocationsScreen() {
     const recompute = () => {
       const next: Record<string, number> = {};
       for (const p of DEFAULT_PLACEMENTS) next[p.name] = 0;
-      for (const c of getCards()) {
+      for (const c of getItems()) {
         const key = c.placement || 'Unplaced';
         next[key] = (next[key] ?? 0) + 1;
       }

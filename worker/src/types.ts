@@ -26,9 +26,9 @@ export interface MagicLinkData {
   expires: number;
 }
 
-// ── Card shape (shared with frontend) ────────────────────────────────────────
+// ── Item shape (shared with clients) ─────────────────────────────────────────
 
-export interface Card {
+export interface Item {
   id:        string;
   name:      string;
   number:    string;
@@ -45,7 +45,10 @@ export interface Card {
   updatedAt: string;
 }
 
-/** Records a deleted card so other devices know not to resurrect it. */
+/** @deprecated Use Item — kept as an alias during the Cardex → Foodie rename. */
+export type Card = Item;
+
+/** Records a deleted item so other devices know not to resurrect it. */
 export interface Tombstone {
   id:        string;
   deletedAt: string;

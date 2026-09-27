@@ -1,16 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Card } from '../cards/types';
-import { daysUntilExpiry, getExpiryStatus } from '../cards/types';
+import type { Item } from '../items/types';
+import { daysUntilExpiry, getExpiryStatus } from '../items/types';
 import { colors, spacing } from '../theme/colors';
 
 interface Props {
-  card: Card;
+  item: Item;
   onPress: () => void;
 }
 
-export function ItemCard({ card, onPress }: Props) {
-  const status = getExpiryStatus(card.expiryDate);
-  const days = daysUntilExpiry(card.expiryDate);
+export function ItemCard({ item, onPress }: Props) {
+  const status = getExpiryStatus(item.expiryDate);
+  const days = daysUntilExpiry(item.expiryDate);
   const statusColor =
     status === 'expired'
       ? colors.expired
@@ -29,8 +29,8 @@ export function ItemCard({ card, onPress }: Props) {
   }
 
   const qty =
-    card.quantity && card.quantity > 0
-      ? `${card.quantity}${card.unit ? ` ${card.unit}` : ''}`
+    item.quantity && item.quantity > 0
+      ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}`
       : null;
 
   return (
@@ -41,13 +41,13 @@ export function ItemCard({ card, onPress }: Props) {
     >
       <View style={[styles.stripe, { backgroundColor: statusColor }]} />
       <View style={styles.body}>
-        <Text style={styles.emoji}>{card.emoji || '🍽️'}</Text>
+        <Text style={styles.emoji}>{item.emoji || '🍽️'}</Text>
         <View style={styles.meta}>
           <Text style={styles.name} numberOfLines={1}>
-            {card.productName || card.name}
+            {item.productName || item.name}
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
-            {[card.placement, qty, card.brand].filter(Boolean).join(' · ') || 'Unplaced'}
+            {[item.placement, qty, item.brand].filter(Boolean).join(' · ') || 'Unplaced'}
           </Text>
           <Text style={[styles.expiry, { color: statusColor }]}>{expiryLabel}</Text>
         </View>

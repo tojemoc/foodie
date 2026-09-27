@@ -3,7 +3,7 @@ import { corsHeaders, jsonResponse } from './lib/http.js';
 import { registerBegin, registerFinish, loginBegin, loginFinish } from './auth/passkey.js';
 import { magicSend, magicVerify }    from './auth/magic.js';
 import { verifyToken }               from './auth/jwt.js';
-import { getCards, setCards }        from './cards.js';
+import { getItems, setItems, getCardsLegacy, setCardsLegacy } from './items.js';
 import { getVapidPublicKey, pushSubscribe, pushUnsubscribe } from './push.js';
 import { getUser }                   from './lib/kv.js';
 import { runExpiryDigest }           from './scheduled/expiry-digest.js';
@@ -49,9 +49,12 @@ export default {
         }
       }
 
-      // ── Cards ────────────────────────────────────────────────────────────────
-      else if (pathname === '/cards' && request.method === 'GET')  response = await getCards(request, env);
-      else if (pathname === '/cards' && request.method === 'POST') response = await setCards(request, env);
+      // ── Items ────────────────────────────────────────────────────────────────
+      else if (pathname === '/items' && request.method === 'GET')  response = await getItems(request, env);
+      else if (pathname === '/items' && request.method === 'POST') response = await setItems(request, env);
+      // Legacy Cardex path (same handlers; GET still returns `cards` for old clients)
+      else if (pathname === '/cards' && request.method === 'GET')  response = await getCardsLegacy(request, env);
+      else if (pathname === '/cards' && request.method === 'POST') response = await setCardsLegacy(request, env);
 
       // ── Web Push ─────────────────────────────────────────────────────────────
       else if (pathname === '/push/vapid-public-key' && request.method === 'GET')  response = await getVapidPublicKey(request, env);

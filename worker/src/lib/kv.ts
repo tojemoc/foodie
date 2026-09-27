@@ -1,4 +1,4 @@
-import type { Env, User, Credential, ChallengeData, MagicLinkData, Card, Tombstone } from '../types.js';
+import type { Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone } from '../types.js';
 
 // ── User ─────────────────────────────────────────────────────────────────────
 
@@ -50,13 +50,24 @@ export async function getAndDeleteMagicLink(
   return data;
 }
 
-// ── Cards ─────────────────────────────────────────────────────────────────────
+// ── Items (legacy KV key `cards:` still read for migration) ───────────────────
 
-export const getCards = (env: Env, userId: string) =>
-  env.FOODIE_KV.get<Card[]>(`cards:${userId}`, 'json');
+export async function getItems(env: Env, userId: string): Promise<Item[] | null> {
+  const modern = await env.FOODIE_KV.get<Item[]>(`items:${userId}`, 'json');
+  if (modern) return modern;
+  return env.FOODIE_KV.get<Item[]>(`cards:${userId}`, 'json');
+}
 
-export const putCards = (env: Env, userId: string, cards: Card[]) =>
-  env.FOODIE_KV.put(`cards:${userId}`, JSON.stringify(cards));
+export async function putItems(env: Env, userId: string, items: Item[]): Promise<void> {
+  await env.FOODIE_KV.put(`items:${userId}`, JSON.stringify(items));
+  // Drop legacy key after a successful write so digests/clients converge.
+  await env.FOODIE_KV.delete(`cards:${userId}`);
+}
+
+/** @deprecated Use getItems */
+export const getCards = getItems;
+/** @deprecated Use putItems */
+export const putCards = putItems;
 
 // ── Web Push subscriptions ────────────────────────────────────────────────────
 // One KV record per endpoint: `pushsub:{userId}:{endpointHash}` — avoids

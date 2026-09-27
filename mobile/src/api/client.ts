@@ -1,4 +1,4 @@
-import type { AuthResponse, Card, Tombstone } from '../cards/types';
+import type { AuthResponse, Item, Tombstone } from '../items/types';
 
 export const API_BASE = (
   process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8787'
@@ -36,8 +36,8 @@ export const authMagicVerify = (token: string) =>
 export const authMe = () =>
   request<{ id: string; username: string; email: string }>('/auth/me', 'GET');
 
-export const fetchCards = () =>
-  request<{ cards: Card[]; tombstones: Tombstone[]; error?: string }>('/cards', 'GET');
+export const fetchItems = () =>
+  request<{ items: Item[]; tombstones: Tombstone[]; error?: string }>('/items', 'GET');
 
-export const pushCards = (cards: Card[], tombstones: Tombstone[]) =>
-  request<{ ok: boolean; error?: string }>('/cards', 'POST', { cards, tombstones });
+export const pushItems = (items: Item[], tombstones: Tombstone[]) =>
+  request<{ ok: boolean; error?: string }>('/items', 'POST', { items, tombstones });

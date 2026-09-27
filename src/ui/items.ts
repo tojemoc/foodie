@@ -1,6 +1,6 @@
-import type { Card }                    from '../types.js';
-import { getCards, addCard, updateCard, removeCard, makeCard, touchCard } from '../cards/store.js';
-import { pushToRemote }                from '../cards/sync.js';
+import type { Item }                    from '../types.js';
+import { getItems, addItem, updateItem, removeItem, makeItem, touchItem } from '../items/store.js';
+import { pushToRemote }                from '../items/sync.js';
 import { showToast }                   from './toast.js';
 import { isScanCameraSupported, startScan } from '../scanner/scanner.js';
 import { lookupBarcode }               from '../services/openfood.js';
@@ -44,21 +44,21 @@ const FRESH_ITEM_TEMPLATES: Record<string, { name: string; brand?: string; place
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let currentCardId: string | null = null;
+let currentItemId: string | null = null;
 let currentFilter = 'all';
 let editMode = false;
 let wizardStep = 1;
 
-// ── Card grid ─────────────────────────────────────────────────────────────────
+// ── Item grid ─────────────────────────────────────────────────────────────────
 
-export function renderCards(): void {
+export function renderItems(): void {
   const grid  = document.getElementById('card-grid');
   const count = document.getElementById('cards-count');
   if (!grid) return;
   buildPlacementChips();
 
   const query = ((document.getElementById('search-input') as HTMLInputElement)?.value ?? '').toLowerCase();
-  let filtered = getCards();
+  let filtered = getItems();
   if (currentFilter !== 'all') filtered = filtered.filter(c => getPlacement(c).toLowerCase() === currentFilter);
   if (query) filtered = filtered.filter(c =>
     c.name.toLowerCase().includes(query) || c.number.toLowerCase().includes(query)
@@ -67,7 +67,7 @@ export function renderCards(): void {
   if (count) count.textContent = `${filtered.length} item${filtered.length !== 1 ? 's' : ''}`;
 
   if (!filtered.length) {
-    const allEmpty = getCards().length === 0;
+    const allEmpty = getItems().length === 0;
     grid.innerHTML = `
       <div style="grid-column:1/-1">
         <div class="empty-state">
@@ -127,15 +127,15 @@ export function filterByCategory(el: HTMLElement, cat: string): void {
   currentFilter = cat;
   document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
-  renderCards();
+  renderItems();
 }
 
 // ── Detail sheet ──────────────────────────────────────────────────────────────
 
 export function openDetail(id: string): void {
-  const card = getCards().find(c => c.id === id);
+  const card = getItems().find(c => c.id === id);
   if (!card) return;
-  currentCardId = id;
+  currentItemId = id;
 
   setText('detail-icon',   placementEmoji(getPlacement(card)));
   setText('detail-name',   displayName(card));
@@ -156,7 +156,7 @@ export function openDetail(id: string): void {
 
 // ── Add / Edit form ───────────────────────────────────────────────────────────
 
-export function openAddSheet(prefill?: Card): void {
+export function openAddSheet(prefill?: Item): void {
   editMode = !!prefill;
   setText('add-sheet-title', editMode ? 'Edit Item' : 'Add Item');
   wizardStep = 1;
@@ -329,13 +329,13 @@ async function handleExpiryScan(): Promise<void> {
 }
 
 export function openEditSheet(): void {
-  const card = getCards().find(c => c.id === currentCardId);
+  const card = getItems().find(c => c.id === currentItemId);
   if (!card) return;
   closeSheet('detail-overlay');
   setTimeout(() => openAddSheet(card), 200);
 }
 
-export async function saveCard(): Promise<void> {
+export async function saveItem(): Promise<void> {
   const name        = getVal('f-name');
   const brand       = getVal('f-brand') || undefined;
   const number      = getVal('f-number');
@@ -348,28 +348,28 @@ export async function saveCard(): Promise<void> {
   if (!name)   { showToast('Please enter a product name'); return; }
   if (!number && !isFreshTemplatePlacement(placement)) { showToast('Please enter an item number'); return; }
 
-  if (editMode && currentCardId) {
-    const existing = getCards().find(c => c.id === currentCardId);
+  if (editMode && currentItemId) {
+    const existing = getItems().find(c => c.id === currentItemId);
     if (existing) {
-      updateCard(touchCard({ ...existing, name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: existing.color || COLORS[0]!, emoji: placementEmoji(placement) }));
+      updateItem(touchItem({ ...existing, name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: existing.color || COLORS[0]!, emoji: placementEmoji(placement) }));
       showToast('Item updated!');
     }
   } else {
-    addCard(makeCard({ name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: COLORS[0]!, emoji: placementEmoji(placement) }));
+    addItem(makeItem({ name, productName: name, brand, number, format, category, placement, notes, expiryDate, color: COLORS[0]!, emoji: placementEmoji(placement) }));
     showToast('Item added! 🎉');
   }
 
   closeSheet('add-overlay');
-  renderCards();
-  notifyExpiring(getCards());
+  renderItems();
+  notifyExpiring(getItems());
   await pushToRemote();
 }
 
-export async function deleteCurrentCard(): Promise<void> {
-  if (!currentCardId || !confirm('Delete this item?')) return;
-  removeCard(currentCardId);
+export async function deleteCurrentItem(): Promise<void> {
+  if (!currentItemId || !confirm('Delete this item?')) return;
+  removeItem(currentItemId);
   closeSheet('detail-overlay');
-  renderCards();
+  renderItems();
   showToast('Item deleted');
   await pushToRemote();
 }
@@ -429,7 +429,7 @@ export function buildPlacementChips(): void {
   const el = document.getElementById('placement-chips');
   if (!el) return;
   const dynamicPlacements = new Set(DEFAULT_PLACEMENTS);
-  for (const card of getCards()) dynamicPlacements.add(getPlacement(card));
+  for (const card of getItems()) dynamicPlacements.add(getPlacement(card));
   const placements = ['All', ...Array.from(dynamicPlacements)];
 
   // Validate currentFilter: if not in placements, reset to 'all'
@@ -485,7 +485,7 @@ export function showPage(page: string): void {
     settingsBtn.style.background = page === 'settings' ? 'var(--surface)' : '';
   }
 
-  // FAB only makes sense on the home/cards page
+  // FAB only makes sense on the home/items page
   const fab = document.querySelector<HTMLElement>('.fab');
   if (fab) fab.style.display = page === 'home' ? 'flex' : 'none';
 }
@@ -498,14 +498,14 @@ export function toggleSearch(): void {
   if (!vis) document.getElementById('search-input')?.focus();
   else {
     (document.getElementById('search-input') as HTMLInputElement).value = '';
-    renderCards();
+    renderItems();
   }
 }
 
 // ── Export / Import ───────────────────────────────────────────────────────────
 
-export function exportCards(): void {
-  const blob = new Blob([JSON.stringify(getCards(), null, 2)], { type: 'application/json' });
+export function exportItems(): void {
+  const blob = new Blob([JSON.stringify(getItems(), null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
   a.download = 'foodie-backup.json';
@@ -513,24 +513,24 @@ export function exportCards(): void {
   showToast('Items exported!');
 }
 
-export async function importCards(e: Event): Promise<void> {
+export async function importItems(e: Event): Promise<void> {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
   const text = await file.text();
   try {
-    const imported = JSON.parse(text) as Card[];
+    const imported = JSON.parse(text) as Item[];
     if (!Array.isArray(imported)) throw new Error('Not an array');
-    const existing = new Set(getCards().map(c => c.id));
+    const existing = new Set(getItems().map(c => c.id));
     let added = 0;
     for (const c of imported) {
       // Allow cards without barcode number if they are fresh template items
       const hasValidNumber = c.number || isFreshTemplatePlacement(c.placement || '');
       if (c.id && c.name && hasValidNumber && !existing.has(c.id)) {
-        addCard(c);
+        addItem(c);
         added++;
       }
     }
-    renderCards();
+    renderItems();
     showToast(`Imported ${added} item(s)`);
     await pushToRemote();
   } catch {
@@ -559,13 +559,13 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function formatTileExpiry(c: Card): string {
+function formatTileExpiry(c: Item): string {
   const parts = formatExpiryDisplayParts(c.expiryDate);
   if (!parts) return 'No expiry';
   return `Expires ${parts.nice} (${parts.rel})`;
 }
 
-function formatDetailExpiry(card: Card): string {
+function formatDetailExpiry(card: Item): string {
   const parts = formatExpiryDisplayParts(card.expiryDate);
   if (!parts) return 'No expiry date set';
   return `Expiry: ${parts.nice} — ${parts.rel}`;
@@ -605,11 +605,11 @@ function formatExpiryDisplayParts(iso: string | undefined): { nice: string; rel:
   return { nice, rel };
 }
 
-function displayName(card: Card): string {
+function displayName(card: Item): string {
   return card.productName || card.name;
 }
 
-function getPlacement(card: Card): string {
+function getPlacement(card: Item): string {
   if (card.placement) return card.placement;
   return cap(card.category || 'other');
 }

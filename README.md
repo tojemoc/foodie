@@ -47,7 +47,7 @@ PWA camera/OCR/iOS install quirks became an infinity loop. The product is being 
 | Best-before OCR | On-device text recognition (optional ML Kit) + multi-format parser (EU/US/packed/Julian, multilingual keywords). **No LLM.** |
 | Product lookup | Open Food Facts → Open Products Facts → Open Beauty Facts → UPCitemdb + local cache |
 | Produce photos | Bundled offline catalog (bananas etc.) + colour/label matching + quantity heuristics; user corrections stay on device |
-| Sync | Same `/cards` LWW + tombstones API as the PWA |
+| Sync | Same `/items` LWW + tombstones API as the PWA (`/cards` kept as legacy alias) |
 | Auth | Magic link (passkeys remain on the web client for now) |
 | Distribution | Unsigned IPA via GitHub Actions → SideStore |
 

@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Card, Tombstone } from './types';
+import type { Item, Tombstone } from './types';
 
-const STORE_KEY = 'foodie_v3_cards';
+const STORE_KEY = 'foodie_v3_items';
 const TOMBSTONE_KEY = 'foodie_v3_tombstones';
+const LEGACY_STORE_KEY = 'foodie_v3_cards';
 const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-let _cards: Card[] = [];
+let _items: Item[] = [];
 let _tombstones: Tombstone[] = [];
 const listeners = new Set<() => void>();
 
@@ -18,17 +19,17 @@ export function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-export function getCards(): Card[] {
-  return _cards;
+export function getItems(): Item[] {
+  return _items;
 }
 
 export function getTombstones(): Tombstone[] {
   return _tombstones;
 }
 
-export function setCards(cards: Card[]): void {
-  _cards = cards;
-  void persistCards();
+export function setItems(items: Item[]): void {
+  _items = items;
+  void persistItems();
   notify();
 }
 
@@ -37,22 +38,22 @@ export function setTombstones(tombstones: Tombstone[]): void {
   void persistTombstones();
 }
 
-export function addCard(card: Card): void {
-  _cards = [card, ..._cards];
-  void persistCards();
+export function addItem(item: Item): void {
+  _items = [item, ..._items];
+  void persistItems();
   notify();
 }
 
-export function updateCard(updated: Card): void {
-  _cards = _cards.map((c) => (c.id === updated.id ? updated : c));
-  void persistCards();
+export function updateItem(updated: Item): void {
+  _items = _items.map((c) => (c.id === updated.id ? updated : c));
+  void persistItems();
   notify();
 }
 
-export function removeCard(id: string): void {
-  _cards = _cards.filter((c) => c.id !== id);
+export function removeItem(id: string): void {
+  _items = _items.filter((c) => c.id !== id);
   addTombstone(id);
-  void persistCards();
+  void persistItems();
   notify();
 }
 
@@ -67,12 +68,14 @@ function pruneTombstones(): void {
   _tombstones = _tombstones.filter((t) => new Date(t.deletedAt).getTime() > cutoff);
 }
 
-export async function loadFromStorage(): Promise<Card[]> {
+export async function loadFromStorage(): Promise<Item[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORE_KEY);
-    if (raw) _cards = JSON.parse(raw) as Card[];
+    const raw =
+      (await AsyncStorage.getItem(STORE_KEY)) ??
+      (await AsyncStorage.getItem(LEGACY_STORE_KEY));
+    if (raw) _items = JSON.parse(raw) as Item[];
   } catch {
-    _cards = [];
+    _items = [];
   }
   try {
     const raw = await AsyncStorage.getItem(TOMBSTONE_KEY);
@@ -83,20 +86,20 @@ export async function loadFromStorage(): Promise<Card[]> {
     _tombstones = [];
   }
   notify();
-  return _cards;
+  return _items;
 }
 
-async function persistCards(): Promise<void> {
-  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(_cards));
+async function persistItems(): Promise<void> {
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(_items));
 }
 
 async function persistTombstones(): Promise<void> {
   await AsyncStorage.setItem(TOMBSTONE_KEY, JSON.stringify(_tombstones));
 }
 
-export function makeCard(
-  partial: Omit<Card, 'id' | 'createdAt' | 'updatedAt'>,
-): Card {
+export function makeItem(
+  partial: Omit<Item, 'id' | 'createdAt' | 'updatedAt'>,
+): Item {
   const now = new Date().toISOString();
   return {
     ...partial,
@@ -106,6 +109,6 @@ export function makeCard(
   };
 }
 
-export function touchCard(card: Card): Card {
-  return { ...card, updatedAt: new Date().toISOString() };
+export function touchItem(item: Item): Item {
+  return { ...item, updatedAt: new Date().toISOString() };
 }

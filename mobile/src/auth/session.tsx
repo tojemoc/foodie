@@ -9,9 +9,9 @@ import {
   type ReactNode,
 } from 'react';
 import { authMagicSend, authMagicVerify, authMe, setToken } from '../api/client';
-import type { Session } from '../cards/types';
-import { loadFromStorage } from '../cards/store';
-import { syncOnOpen } from '../cards/sync';
+import type { Session } from '../items/types';
+import { loadFromStorage } from '../items/store';
+import { syncOnOpen } from '../items/sync';
 
 const SESSION_KEY = 'foodie_session_v3';
 

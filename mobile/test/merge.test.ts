@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mergeCards } from '../src/cards/merge';
-import type { Card } from '../src/cards/types';
+import { mergeItems } from '../src/items/merge';
+import type { Item } from '../src/items/types';
 
-function card(partial: Partial<Card> & Pick<Card, 'id' | 'updatedAt'>): Card {
+function item(partial: Partial<Item> & Pick<Item, 'id' | 'updatedAt'>): Item {
   return {
     name: 'x',
     number: '',
@@ -17,18 +17,21 @@ function card(partial: Partial<Card> & Pick<Card, 'id' | 'updatedAt'>): Card {
   };
 }
 
-describe('mergeCards', () => {
+describe('mergeItems', () => {
   it('applies last-write-wins and tombstones', () => {
-    const local = [card({ id: 'a', name: 'Local', updatedAt: '2026-01-02T00:00:00.000Z' })];
-    const remote = [card({ id: 'a', name: 'Remote', updatedAt: '2026-01-01T00:00:00.000Z' }), card({ id: 'b', name: 'Only remote', updatedAt: '2026-01-01T00:00:00.000Z' })];
-    const { cards, tombstones } = mergeCards(
+    const local = [item({ id: 'a', name: 'Local', updatedAt: '2026-01-02T00:00:00.000Z' })];
+    const remote = [
+      item({ id: 'a', name: 'Remote', updatedAt: '2026-01-01T00:00:00.000Z' }),
+      item({ id: 'b', name: 'Only remote', updatedAt: '2026-01-01T00:00:00.000Z' }),
+    ];
+    const { items, tombstones } = mergeItems(
       local,
       remote,
       [{ id: 'b', deletedAt: '2026-01-03T00:00:00.000Z' }],
       [],
     );
-    assert.equal(cards.find((c) => c.id === 'a')?.name, 'Local');
-    assert.equal(cards.find((c) => c.id === 'b'), undefined);
+    assert.equal(items.find((c) => c.id === 'a')?.name, 'Local');
+    assert.equal(items.find((c) => c.id === 'b'), undefined);
     assert.equal(tombstones.length, 1);
   });
 });

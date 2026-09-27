@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { ItemCard } from '../../src/components/ItemCard';
-import { getCards, subscribe } from '../../src/cards/store';
-import { onSyncStatus } from '../../src/cards/sync';
-import type { Card, SyncStatus } from '../../src/cards/types';
-import { getExpiryStatus } from '../../src/cards/types';
+import { getItems, subscribe } from '../../src/items/store';
+import { onSyncStatus } from '../../src/items/sync';
+import type { Item, SyncStatus } from '../../src/items/types';
+import { getExpiryStatus } from '../../src/items/types';
 import { useSession } from '../../src/auth/session';
 import { colors, spacing } from '../../src/theme/colors';
 
@@ -21,12 +21,12 @@ type Filter = 'all' | 'expiring' | 'expired';
 export default function InventoryScreen() {
   const router = useRouter();
   const { session, ready } = useSession();
-  const [cards, setCardsState] = useState<Card[]>(getCards());
+  const [items, setItemsState] = useState<Item[]>(getItems());
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [syncLabel, setSyncLabel] = useState('Local');
 
-  useEffect(() => subscribe(() => setCardsState(getCards())), []);
+  useEffect(() => subscribe(() => setItemsState(getItems())), []);
   useEffect(
     () =>
       onSyncStatus((_s: SyncStatus, message?: string) => {
@@ -37,7 +37,7 @@ export default function InventoryScreen() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return cards
+    return items
       .filter((c) => {
         if (filter === 'expiring') return getExpiryStatus(c.expiryDate) === 'expiring-soon';
         if (filter === 'expired') return getExpiryStatus(c.expiryDate) === 'expired';
@@ -54,7 +54,7 @@ export default function InventoryScreen() {
         const be = b.expiryDate ?? '9999';
         return ae.localeCompare(be);
       });
-  }, [cards, query, filter]);
+  }, [items, query, filter]);
 
   const onPressItem = useCallback(
     (id: string) => {
@@ -126,7 +126,7 @@ export default function InventoryScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <ItemCard card={item} onPress={() => onPressItem(item.id)} />
+          <ItemCard item={item} onPress={() => onPressItem(item.id)} />
         )}
       />
     </View>

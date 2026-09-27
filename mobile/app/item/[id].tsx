@@ -1,17 +1,17 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../src/components/Button';
-import { getCards, removeCard, touchCard, updateCard } from '../../src/cards/store';
-import { pushToRemote } from '../../src/cards/sync';
-import { daysUntilExpiry, getExpiryStatus } from '../../src/cards/types';
+import { getItems, removeItem, touchItem, updateItem } from '../../src/items/store';
+import { pushToRemote } from '../../src/items/sync';
+import { daysUntilExpiry, getExpiryStatus } from '../../src/items/types';
 import { colors, spacing } from '../../src/theme/colors';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const card = getCards().find((c) => c.id === id);
+  const item = getItems().find((c) => c.id === id);
 
-  if (!card) {
+  if (!item) {
     return (
       <View style={styles.screen}>
         <Text style={styles.muted}>Item not found.</Text>
@@ -20,32 +20,32 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const status = getExpiryStatus(card.expiryDate);
-  const days = daysUntilExpiry(card.expiryDate);
+  const status = getExpiryStatus(item.expiryDate);
+  const days = daysUntilExpiry(item.expiryDate);
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.emoji}>{card.emoji || '🍽️'}</Text>
-      <Text style={styles.name}>{card.productName || card.name}</Text>
-      {!!card.brand && <Text style={styles.muted}>{card.brand}</Text>}
+      <Text style={styles.emoji}>{item.emoji || '🍽️'}</Text>
+      <Text style={styles.name}>{item.productName || item.name}</Text>
+      {!!item.brand && <Text style={styles.muted}>{item.brand}</Text>}
       <Text style={styles.meta}>
-        {[card.placement, card.quantity ? `${card.quantity} ${card.unit ?? ''}`.trim() : null]
+        {[item.placement, item.quantity ? `${item.quantity} ${item.unit ?? ''}`.trim() : null]
           .filter(Boolean)
           .join(' · ')}
       </Text>
       <Text style={styles.meta}>
-        Expiry: {card.expiryDate ?? '—'} ({status}
+        Expiry: {item.expiryDate ?? '—'} ({status}
         {days !== null ? `, ${days}d` : ''})
       </Text>
-      {!!card.number && <Text style={styles.muted}>Barcode {card.number}</Text>}
-      {!!card.lookupSource && <Text style={styles.muted}>Lookup: {card.lookupSource}</Text>}
-      {!!card.notes && <Text style={styles.notes}>{card.notes}</Text>}
+      {!!item.number && <Text style={styles.muted}>Barcode {item.number}</Text>}
+      {!!item.lookupSource && <Text style={styles.muted}>Lookup: {item.lookupSource}</Text>}
+      {!!item.notes && <Text style={styles.notes}>{item.notes}</Text>}
 
       <Button
         title="Mark used / delete"
         variant="danger"
         onPress={() => {
-          removeCard(card.id);
+          removeItem(item.id);
           void pushToRemote();
           router.replace('/');
         }}
@@ -54,7 +54,7 @@ export default function ItemDetailScreen() {
         title="Bump updated time"
         variant="ghost"
         onPress={() => {
-          updateCard(touchCard(card));
+          updateItem(touchItem(item));
           void pushToRemote();
         }}
       />

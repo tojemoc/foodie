@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, SectionTitle } from '../../src/components/Button';
-import { addCard, makeCard } from '../../src/cards/store';
-import { pushToRemote } from '../../src/cards/sync';
-import { DEFAULT_PLACEMENTS } from '../../src/cards/types';
+import { addItem, makeItem } from '../../src/items/store';
+import { pushToRemote } from '../../src/items/sync';
+import { DEFAULT_PLACEMENTS } from '../../src/items/types';
 import { datesFromOcrText, recognizeTextFromImageUri } from '../../src/ocr/textRecognition';
 import type { DateExtractionResult } from '../../src/ocr/dateExtraction';
 import { lookupBarcode, rememberProduct } from '../../src/products/lookup';
@@ -205,7 +205,7 @@ export default function AddItemScreen() {
     if (!name.trim()) return;
     const qty = Number(quantity) || 1;
     const place = DEFAULT_PLACEMENTS.find((p) => p.id === placement);
-    const card = makeCard({
+    const item = makeItem({
       name: name.trim(),
       productName: name.trim(),
       brand: brand.trim() || undefined,
@@ -223,7 +223,7 @@ export default function AddItemScreen() {
       source,
       lookupSource: lookupSource || undefined,
     });
-    addCard(card);
+    addItem(item);
     if (ean) {
       await rememberProduct(ean, {
         name: name.trim(),
