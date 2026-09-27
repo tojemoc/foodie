@@ -20,7 +20,11 @@ export async function getItems(request: Request, env: Env): Promise<Response> {
   return jsonResponse({ items, tombstones }, 200, env);
 }
 
-export async function setItems(request: Request, env: Env): Promise<Response> {
+export async function setItems(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   const { userId, error } = await verifyToken(request, env);
   if (error || !userId) return jsonResponse({ error: error ?? 'Unauthorized' }, 401, env);
 
@@ -35,7 +39,10 @@ export async function setItems(request: Request, env: Env): Promise<Response> {
   const merged   = mergeTombstones(existing, incoming);
   const pruned   = pruneTombstones(merged);
 
-  await kvPutItems(env, userId, items);
+  const write = kvPutItems(env, userId, items);
+  // Keep coalesced KV writes alive if the isolate would otherwise freeze after respond.
+  ctx.waitUntil(write);
+  await write;
   await kvPutTombstones(env, userId, pruned);
 
   return jsonResponse({ ok: true, count: items.length }, 200, env);
@@ -52,8 +59,12 @@ export async function getCardsLegacy(request: Request, env: Env): Promise<Respon
 }
 
 /** Legacy `/cards` POST — accepts `cards` or `items`. */
-export async function setCardsLegacy(request: Request, env: Env): Promise<Response> {
-  return setItems(request, env);
+export async function setCardsLegacy(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  return setItems(request, env, ctx);
 }
 
 function mergeTombstones(a: Tombstone[], b: Tombstone[]): Tombstone[] {

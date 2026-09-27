@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { authMagicSend, authMagicVerify, authMe, setToken } from '../api/client';
 import type { Session } from '../items/types';
-import { loadFromStorage } from '../items/store';
+import { loadFromStorage, selectStorageNamespace } from '../items/store';
 import { syncOnOpen } from '../items/sync';
 
 const SESSION_KEY = 'foodie_session_v3';
@@ -44,6 +44,24 @@ async function writeSession(session: Session | null): Promise<void> {
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
 }
 
+function isAuthFailure(status?: number): boolean {
+  return status === 401 || status === 403;
+}
+
+function isRetryableServerError(status?: number): boolean {
+  return typeof status === 'number' && status >= 500 && status <= 599;
+}
+
+async function useAnonymousInventory(): Promise<void> {
+  await selectStorageNamespace({ kind: 'anonymous' });
+  await loadFromStorage();
+}
+
+async function useAccountInventory(userId: string): Promise<void> {
+  await selectStorageNamespace({ kind: 'account', userId });
+  await loadFromStorage();
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
@@ -51,26 +69,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await loadFromStorage();
       const stored = await readSession();
       if (cancelled) return;
-      if (stored?.token) {
+
+      if (stored?.token && stored.userId) {
+        // Restore the saved account namespace before any sync attempt.
+        await useAccountInventory(stored.userId);
+        if (cancelled) return;
         setToken(stored.token);
         const me = await authMe();
         if (cancelled) return;
-        // Network / unreachable API — keep the stored session for offline use.
-        if (me.status === 0) {
+
+        if (me.status === 0 || isRetryableServerError(me.status)) {
+          // Unreachable API or transient 5xx — keep token + account inventory.
           setSession(stored);
-        } else if (me.error || me.status === 401 || !me.id) {
+        } else if (isAuthFailure(me.status) || (!me.id && me.error)) {
           setToken(null);
           await writeSession(null);
           setSession(null);
-        } else {
+          await useAnonymousInventory();
+        } else if (me.id) {
           setSession(stored);
           void syncOnOpen();
+        } else {
+          // Unexpected error shape — keep session like retryable failures.
+          setSession(stored);
         }
+      } else {
+        await useAnonymousInventory();
       }
-      setReady(true);
+      if (!cancelled) setReady(true);
     })();
     return () => {
       cancelled = true;
@@ -83,7 +111,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const verifyMagicToken = useCallback(async (token: string) => {
     const res = await authMagicVerify(token);
-    if (res.error || !res.token) {
+    if (res.error || !res.token || !res.userId) {
       return { ok: false, error: res.error ?? 'Invalid or expired link' };
     }
     const next: Session = {
@@ -93,6 +121,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     setToken(next.token);
     await writeSession(next);
+    // Switch to the verified account namespace before sync — leave anon untouched.
+    await useAccountInventory(next.userId);
     setSession(next);
     void syncOnOpen();
     return { ok: true };
@@ -102,11 +132,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setToken(null);
     await writeSession(null);
     setSession(null);
+    await useAnonymousInventory();
   }, []);
 
   const continueOffline = useCallback(() => {
     setSession(null);
     setToken(null);
+    void useAnonymousInventory();
   }, []);
 
   const value = useMemo(

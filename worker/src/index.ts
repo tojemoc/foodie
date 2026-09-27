@@ -13,7 +13,7 @@ export default {
     ctx.waitUntil(runExpiryDigest(env));
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const requestOrigin = request.headers.get('Origin') ?? undefined;
     const cors          = corsHeaders(env, requestOrigin);
 
@@ -51,10 +51,10 @@ export default {
 
       // ── Items ────────────────────────────────────────────────────────────────
       else if (pathname === '/items' && request.method === 'GET')  response = await getItems(request, env);
-      else if (pathname === '/items' && request.method === 'POST') response = await setItems(request, env);
+      else if (pathname === '/items' && request.method === 'POST') response = await setItems(request, env, ctx);
       // Legacy Cardex path (same handlers; GET still returns `cards` for old clients)
       else if (pathname === '/cards' && request.method === 'GET')  response = await getCardsLegacy(request, env);
-      else if (pathname === '/cards' && request.method === 'POST') response = await setCardsLegacy(request, env);
+      else if (pathname === '/cards' && request.method === 'POST') response = await setCardsLegacy(request, env, ctx);
 
       // ── Web Push ─────────────────────────────────────────────────────────────
       else if (pathname === '/push/vapid-public-key' && request.method === 'GET')  response = await getVapidPublicKey(request, env);
