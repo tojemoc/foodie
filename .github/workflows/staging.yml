@@ -31,7 +31,8 @@ jobs:
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
-          wranglerVersion: latest
+          # Use the wrangler version installed by npm ci (do not pin "latest":
+          # newer wrangler peers on @cloudflare/workers-types@5 and npm i fails).
           apiToken:         ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId:        ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
@@ -52,6 +53,10 @@ jobs:
       - name: Install frontend deps
         run: npm ci --legacy-peer-deps
 
+      - name: Install worker deps (wrangler for Pages deploy)
+        working-directory: worker
+        run: npm ci
+
       - name: Type-check frontend
         run: npm run type-check
 
@@ -63,7 +68,6 @@ jobs:
       - name: Deploy to Cloudflare Pages (staging)
         uses: cloudflare/wrangler-action@v3
         with:
-          wranglerVersion: latest
           apiToken:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
