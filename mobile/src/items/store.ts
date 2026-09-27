@@ -102,11 +102,6 @@ function addTombstone(id: string): void {
   void persistTombstones();
 }
 
-function pruneTombstones(): void {
-  const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
-  _tombstones = _tombstones.filter((t) => new Date(t.deletedAt).getTime() > cutoff);
-}
-
 export async function loadFromStorage(): Promise<Item[]> {
   const gen = _generation;
   const ns = _namespace;
