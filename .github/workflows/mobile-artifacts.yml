@@ -1,0 +1,313 @@
+# Mobile artifacts (SideStore)
+# Manual unsigned iOS IPA (+ optional Android APK) for SideStore / AltStore.
+# Mirrors the approach used in tojemoc/vmp and tojemoc/floaty.
+
+name: Mobile artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: API base URL baked into EXPO_PUBLIC_API_URL
+        required: true
+        type: string
+      frontend_host:
+        description: Frontend host for Universal / App Links
+        required: true
+        type: string
+      flavor:
+        description: Release channel label (used in GitHub Release tag)
+        required: true
+        default: development
+        type: choice
+        options:
+          - release
+          - beta
+          - nightly
+          - development
+      build_number:
+        description: iOS build number (defaults to this workflow run number)
+        required: false
+        type: string
+      publish_release:
+        description: Publish GitHub Release + regenerate AltStore source JSON
+        required: true
+        default: true
+        type: boolean
+      build_android:
+        description: Also build and upload an Android release APK
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: mobile-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  EXPO_NO_TELEMETRY: 1
+  CI: 1
+
+jobs:
+  validate-mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Guard publishing from main only
+        if: ${{ inputs.publish_release && github.ref != 'refs/heads/main' }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "::error::Publishing is only allowed from main. Disable publish_release for feature-branch artifact builds."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+  build-ios:
+    needs: validate-mobile
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+      EXPO_PUBLIC_FRONTEND_HOST: ${{ inputs.frontend_host }}
+      FRONTEND_HOST: ${{ inputs.frontend_host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Inject CI frontend host
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'app.json';
+          const host = process.env.FRONTEND_HOST;
+          const app = JSON.parse(fs.readFileSync(path, 'utf8'));
+          app.expo.ios = app.expo.ios || {};
+          app.expo.ios.associatedDomains = [`applinks:${host}`];
+          const buildNumber = process.env.BUILD_NUMBER || process.env.GITHUB_RUN_NUMBER || '1';
+          app.expo.ios.buildNumber = String(buildNumber);
+          app.expo.android = app.expo.android || {};
+          app.expo.android.intentFilters = (app.expo.android.intentFilters || []).map((filter) => ({
+            ...filter,
+            data: (filter.data || []).map((entry) =>
+              entry.scheme === 'https' ? { ...entry, host } : entry,
+            ),
+          }));
+          fs.writeFileSync(path, `${JSON.stringify(app, null, 2)}\n`);
+          NODE
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+
+      - name: Prebuild iOS
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build unsigned iOS app
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace ios/Foodie.xcworkspace \
+            -scheme Foodie \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            clean build
+
+      - name: Package IPA for SideStore
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./mobile/app.json').expo.version")"
+          BUILD="${{ inputs.build_number || github.run_number }}"
+          APP_PATH="mobile/ios/build/Build/Products/Release-iphoneos/Foodie.app"
+          mkdir -p "dist/${VERSION}"
+          chmod +x scripts/package-ios-ipa-for-sidestore.sh
+          scripts/package-ios-ipa-for-sidestore.sh \
+            "$APP_PATH" \
+            "dist/${VERSION}/foodie-${VERSION}-ios.ipa"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=${BUILD}" >> "$GITHUB_ENV"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ios-ipa
+          path: dist/**/*.ipa
+          if-no-files-found: error
+
+  build-android:
+    if: ${{ inputs.build_android }}
+    needs: validate-mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url }}
+      EXPO_PUBLIC_FRONTEND_HOST: ${{ inputs.frontend_host }}
+      FRONTEND_HOST: ${{ inputs.frontend_host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Inject CI frontend host
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const host = process.env.FRONTEND_HOST;
+          const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          app.expo.ios = app.expo.ios || {};
+          app.expo.ios.associatedDomains = [`applinks:${host}`];
+          app.expo.android = app.expo.android || {};
+          app.expo.android.intentFilters = (app.expo.android.intentFilters || []).map((filter) => ({
+            ...filter,
+            data: (filter.data || []).map((entry) =>
+              entry.scheme === 'https' ? { ...entry, host } : entry,
+            ),
+          }));
+          fs.writeFileSync('app.json', `${JSON.stringify(app, null, 2)}\n`);
+          NODE
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Package Android artifact
+        run: |
+          mkdir -p dist
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/foodie-mobile-${SHORT_SHA}.apk"
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-android-apk
+          path: mobile/dist/*.apk
+          if-no-files-found: error
+
+  publish:
+    if: ${{ inputs.publish_release }}
+    needs: [build-ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-ios-ipa
+          path: ./artifacts
+
+      - name: Stage release files
+        id: stage
+        run: |
+          set -euo pipefail
+          mkdir -p release/ios
+          find ./artifacts -name '*.ipa' -exec cp {} release/ios/ \;
+          VERSION="$(node -p "require('./mobile/app.json').expo.version")"
+          BUILD="${{ inputs.build_number || github.run_number }}"
+          FLAVOR="${{ inputs.flavor }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "tag=${FLAVOR}-v${VERSION}-build${BUILD}" >> "$GITHUB_OUTPUT"
+          ls -la release/ios/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.stage.outputs.tag }}
+          name: ${{ inputs.flavor }} v${{ steps.stage.outputs.version }} (build ${{ steps.stage.outputs.build }})
+          body: |
+            ## Foodie ${{ inputs.flavor }} iOS build
+
+            - Version: `${{ steps.stage.outputs.version }}`
+            - Build: `${{ steps.stage.outputs.build }}`
+            - API: `${{ inputs.api_url }}`
+            - Commit: `${{ github.sha }}`
+
+            **SideStore / AltStore:** add source  
+            `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/altstore-source.json`
+          prerelease: ${{ inputs.flavor != 'release' }}
+          files: release/ios/*
+
+      - name: Generate AltStore source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ALTSTORE_WAIT_RELEASE_TAG: ${{ steps.stage.outputs.tag }}
+        run: |
+          python3 scripts/generate-altstore-source.py \
+            --meta docs/altstore-source.meta.json \
+            --output docs/altstore-source.json
+
+      - name: Upload AltStore source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: altstore-source
+          path: docs/altstore-source.json

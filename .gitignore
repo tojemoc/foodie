@@ -5,3 +5,8 @@ dist/
 *.tsbuildinfo
 .wrangler/
 .dev.vars
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/dist/
+docs/altstore-source.json

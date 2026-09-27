@@ -1,0 +1,33 @@
+# Foodie — SideStore distribution
+
+## Build
+
+Use GitHub Actions → **Mobile artifacts** (workflow file
+`.github/workflows/mobile-artifacts.yml`).
+
+Required inputs:
+
+- `api_url` — Worker base URL baked into the binary
+- `frontend_host` — host used for Universal Links / App Links
+
+The macOS job runs `expo prebuild`, builds with
+`CODE_SIGNING_ALLOWED=NO`, then packages `Payload/Foodie.app` into
+`foodie-<version>-ios.ipa` via `scripts/package-ios-ipa-for-sidestore.sh`.
+
+## Install on iPhone
+
+1. Install [SideStore](https://sidestore.io/) and complete pairing.
+2. Add the AltStore source (after the first published release):
+
+   `https://<github-owner>.github.io/foodie/altstore-source.json`
+
+3. Install **Foodie**. SideStore re-signs the unsigned IPA with your free
+   personal Apple ID provisioning.
+
+You can also sideload a downloaded IPA artifact directly in SideStore
+without adding a source.
+
+## Refresh
+
+Free Apple IDs expire apps about every 7 days. Open SideStore on the same
+network as your pairing machine (or use SideStore’s VPN refresh) to renew.
