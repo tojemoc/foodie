@@ -63,7 +63,7 @@ cd mobile && EXPO_PUBLIC_API_URL=http://127.0.0.1:8787 npx expo start
 ### Passkey / SideStore notes
 - Passkeys: PWA / localhost RP ID caveats still apply.
 - Mobile auth: magic link + deep link `foodie://` / Universal Links.
-- SideStore: see `docs/ios-sidestore-distribution-playbook.md`. IPA builds need the macOS job in `mobile-artifacts.yml`.
+- SideStore: see `docs/ios-sidestore-distribution-playbook.md`. IPA builds need the macOS job in `mobile-artifacts.yml` (`macos-26` / Xcode 26.4+ for Expo SDK 57).
 
 ### Deploy reminders
 - Staging: push to `main` → `.github/workflows/staging.yml`

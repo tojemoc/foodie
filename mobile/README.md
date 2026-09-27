@@ -45,6 +45,10 @@ npm test
 
 Unsigned IPAs are re-signed by SideStore with your personal Apple ID.
 
+Local / CI iOS builds need **Xcode 26.4+** (Swift 6.2+). Expo SDK 57’s
+`expo-modules-jsi` package will fail on Xcode 16.x with a Swift tools
+version mismatch.
+
 ## Optional on-device OCR native module
 
 After `npx expo prebuild`, you can add:
