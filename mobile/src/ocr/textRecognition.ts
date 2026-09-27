@@ -36,12 +36,13 @@ export async function recognizeTextFromImageUri(uri: string): Promise<OcrResult>
 
 async function resolveRecognizer(): Promise<Recognizer | null> {
   try {
-    // Optional native module — absent in Expo Go / until prebuild + pod install.
-    const req = new Function('m', 'return require(m)') as (m: string) => {
+    // Static require so Metro can resolve the optional native module.
+    // Absent in Expo Go until prebuild + pod install — catch preserves fallback.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mlkit = require('@react-native-ml-kit/text-recognition') as {
       default?: { recognize: (uri: string) => Promise<{ text?: string }> };
       recognize?: (uri: string) => Promise<{ text?: string }>;
     };
-    const mlkit = req('@react-native-ml-kit/text-recognition');
     const api = mlkit.default ?? mlkit;
     if (!api?.recognize) return null;
     return async (uri: string) => {

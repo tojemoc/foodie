@@ -100,6 +100,8 @@ interface RawMatch {
   date: Date;
   pattern: string;
   index: number;
+  /** Exclusive end index of the matched span in the cleaned text. */
+  end: number;
 }
 
 function endOfMonth(year: number, monthIndex: number): Date {
@@ -247,12 +249,31 @@ function parseAllDates(cleaned: string): RawMatch[] {
     while ((m = re.exec(cleaned)) !== null) {
       const d = parse(m);
       if (d && !Number.isNaN(d.getTime()) && isReasonable(d)) {
-        results.push({ date: d, pattern: name, index: m.index });
+        results.push({
+          date: d,
+          pattern: name,
+          index: m.index,
+          end: m.index + m[0].length,
+        });
       }
     }
   }
 
-  return results;
+  return dropContainedMatches(results);
+}
+
+/** Drop shorter spans that sit entirely inside a longer match (e.g. MM/YYYY inside DD/MM/YYYY). */
+function dropContainedMatches(matches: RawMatch[]): RawMatch[] {
+  return matches.filter((inner) => {
+    const contained = matches.some(
+      (outer) =>
+        outer !== inner &&
+        outer.index <= inner.index &&
+        outer.end >= inner.end &&
+        outer.end - outer.index > inner.end - inner.index,
+    );
+    return !contained;
+  });
 }
 
 function scoreCandidate(match: RawMatch, text: string): number {

@@ -167,5 +167,17 @@ export async function lookupBarcode(barcode: string): Promise<ProductInfo | null
 export async function rememberProduct(barcode: string, product: ProductInfo): Promise<void> {
   const cleaned = barcode.replace(/[^\dA-Za-z]/g, '');
   if (!cleaned) return;
-  await cacheSet(cleaned, { ...product, source: product.source || 'manual' });
+  const map = await readCache();
+  const existing = map[cleaned]?.product;
+  const merged: ProductInfo = {
+    ...existing,
+    ...product,
+    // Keep prior provider fields when a manual save omits them.
+    imageUrl: product.imageUrl ?? existing?.imageUrl,
+    category: product.category ?? existing?.category,
+    quantityHint: product.quantityHint ?? existing?.quantityHint,
+    brand: product.brand ?? existing?.brand,
+    source: product.source || existing?.source || 'manual',
+  };
+  await cacheSet(cleaned, merged);
 }

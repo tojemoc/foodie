@@ -36,7 +36,7 @@ Cardex → Foodie. Grocery flows returned: OFF lookup, OCR, placement wizard, pu
 
 ### 4. Native Expo client (current direction)
 
-PWA camera/OCR/iOS install quirks became an infinity loop. The product is being recreated as an **Expo React Native** app installable via **SideStore**, keeping the Worker API + card schema stable. Inspiration from the early React PoC and the Expo layout in `tojemoc/vmp`.
+PWA camera/OCR/iOS install quirks became an infinity loop. The product is being recreated as an **Expo React Native** app installable via **SideStore**, keeping the Worker API + `/items` schema stable. Inspiration from the early React PoC and the Expo layout in `tojemoc/vmp`.
 
 ---
 

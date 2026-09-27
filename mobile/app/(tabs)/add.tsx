@@ -101,17 +101,20 @@ export default function AddItemScreen() {
       setSource('barcode');
       setLoading(true);
       setStatusMsg('Looking up product…');
-      const product = await lookupBarcode(code);
-      setLoading(false);
-      setStatusMsg('');
-      if (product) {
-        setName(product.name);
-        setBrand(product.brand ?? '');
-        setCategory(product.category ?? 'grocery');
-        setLookupSource(product.source);
-        setPhotoUri(product.imageUrl);
+      try {
+        const product = await lookupBarcode(code).catch(() => null);
+        if (product) {
+          setName(product.name);
+          setBrand(product.brand ?? '');
+          setCategory(product.category ?? 'grocery');
+          setLookupSource(product.source);
+          setPhotoUri(product.imageUrl);
+        }
+      } finally {
+        setLoading(false);
+        setStatusMsg('');
+        setStep('product');
       }
-      setStep('product');
     },
     [step],
   );
@@ -134,19 +137,23 @@ export default function AddItemScreen() {
         { base64: true, format: ImageManipulator.SaveFormat.JPEG, compress: 0.5 },
       );
 
-      const pixels = samplePixelsFromJpegBase64(tiny.base64 ?? '');
-      const avg = averageColor(pixels);
-      const fp = colorFingerprint(avg);
-      setColorFp(fp);
-
-      const matches = await recognizeProduce({ pixels, foregroundRatio: 0.5 });
-      setProduceMatches(matches);
+      const pixels = decodeJpegPixels(tiny.base64);
       setSource('produce');
-      if (matches[0]) {
-        applyProduceMatch(matches[0]);
+      if (pixels) {
+        const avg = averageColor(pixels);
+        const fp = colorFingerprint(avg);
+        setColorFp(fp);
+        const matches = await recognizeProduce({ pixels, foregroundRatio: 0.5 });
+        setProduceMatches(matches);
+        if (matches[0]) applyProduceMatch(matches[0]);
+      } else {
+        // No reliable RGB decode — skip colour matching / correction fingerprint.
+        setColorFp(undefined);
+        setProduceMatches([]);
+        setStatusMsg('Colour match unavailable — pick or type the produce name.');
       }
       setStep('product');
-      setStatusMsg('');
+      if (pixels) setStatusMsg('');
     } catch {
       setStatusMsg('Could not analyze photo — enter details manually.');
       setSource('produce');
@@ -438,20 +445,44 @@ export default function AddItemScreen() {
   );
 }
 
-function samplePixelsFromJpegBase64(b64: string): RgbPixel[] {
-  if (!b64) return [{ r: 180, g: 160, b: 40 }];
-  const slice = b64.slice(0, 2048);
-  const pixels: RgbPixel[] = [];
-  for (let i = 0; i < slice.length - 2; i += 48) {
-    const r = slice.charCodeAt(i) % 256;
-    const g = slice.charCodeAt(i + 1) % 256;
-    const b = slice.charCodeAt(i + 2) % 256;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    if (max < 40 || min > 230) continue;
-    pixels.push({ r, g, b });
+/** Decode a tiny JPEG (base64) into RGB samples. Returns null when decode fails. */
+function decodeJpegPixels(b64: string | undefined): RgbPixel[] | null {
+  if (!b64) return null;
+  try {
+    // jpeg-js is a pure-JS decoder — works offline without canvas.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const jpeg = require('jpeg-js') as {
+      decode: (
+        data: Uint8Array,
+        opts?: { useTArray?: boolean; formatAsRGBA?: boolean },
+      ) => { data: Uint8Array; width: number; height: number };
+    };
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const decoded = jpeg.decode(bytes, { useTArray: true, formatAsRGBA: true });
+    const { data, width, height } = decoded;
+    if (!width || !height || data.length < 4) return null;
+
+    const pixels: RgbPixel[] = [];
+    // Sample a centre-weighted grid (skip near-black / near-white as background).
+    const step = Math.max(1, Math.floor(Math.min(width, height) / 8));
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const i = (y * width + x) * 4;
+        const r = data[i] ?? 0;
+        const g = data[i + 1] ?? 0;
+        const b = data[i + 2] ?? 0;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        if (max < 40 || min > 230) continue;
+        pixels.push({ r, g, b });
+      }
+    }
+    return pixels.length ? pixels : null;
+  } catch {
+    return null;
   }
-  return pixels.length ? pixels : [{ r: 180, g: 160, b: 40 }];
 }
 
 const styles = StyleSheet.create({

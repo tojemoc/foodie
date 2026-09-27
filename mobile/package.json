@@ -30,6 +30,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-web-browser": "~57.0.3",
+    "jpeg-js": "^0.4.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -44,5 +45,8 @@
     "@types/react": "~19.2.2",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
+  },
+  "optionalDependencies": {
+    "@react-native-ml-kit/text-recognition": "^2.0.0"
   }
 }

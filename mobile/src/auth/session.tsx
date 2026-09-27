@@ -56,14 +56,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       if (stored?.token) {
         setToken(stored.token);
-        try {
-          await authMe();
+        const me = await authMe();
+        if (cancelled) return;
+        // Network / unreachable API — keep the stored session for offline use.
+        if (me.status === 0) {
           setSession(stored);
-          void syncOnOpen();
-        } catch {
+        } else if (me.error || me.status === 401 || !me.id) {
           setToken(null);
           await writeSession(null);
           setSession(null);
+        } else {
+          setSession(stored);
+          void syncOnOpen();
         }
       }
       setReady(true);

@@ -58,10 +58,48 @@ export async function getItems(env: Env, userId: string): Promise<Item[] | null>
   return env.FOODIE_KV.get<Item[]>(`cards:${userId}`, 'json');
 }
 
-export async function putItems(env: Env, userId: string, items: Item[]): Promise<void> {
-  await env.FOODIE_KV.put(`items:${userId}`, JSON.stringify(items));
-  // Drop legacy key after a successful write so digests/clients converge.
-  await env.FOODIE_KV.delete(`cards:${userId}`);
+/** Per-isolate write coalescer — rapid saves keep only the latest payload. */
+type PendingWrite = {
+  env: Env;
+  items: Item[];
+  waiters: Array<{ resolve: () => void; reject: (err: unknown) => void }>;
+};
+const pendingWrites = new Map<string, PendingWrite>();
+const flushing = new Set<string>();
+
+export function putItems(env: Env, userId: string, items: Item[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existing = pendingWrites.get(userId);
+    if (existing) {
+      existing.env = env;
+      existing.items = items;
+      existing.waiters.push({ resolve, reject });
+    } else {
+      pendingWrites.set(userId, { env, items, waiters: [{ resolve, reject }] });
+    }
+    void flushItemWrites(userId);
+  });
+}
+
+async function flushItemWrites(userId: string): Promise<void> {
+  if (flushing.has(userId)) return;
+  flushing.add(userId);
+  try {
+    while (pendingWrites.has(userId)) {
+      const batch = pendingWrites.get(userId)!;
+      pendingWrites.delete(userId);
+      try {
+        await batch.env.FOODIE_KV.put(`items:${userId}`, JSON.stringify(batch.items));
+        // Drop legacy key after a successful write so digests/clients converge.
+        await batch.env.FOODIE_KV.delete(`cards:${userId}`);
+        for (const w of batch.waiters) w.resolve();
+      } catch (err) {
+        for (const w of batch.waiters) w.reject(err);
+      }
+    }
+  } finally {
+    flushing.delete(userId);
+  }
 }
 
 /** @deprecated Use getItems */

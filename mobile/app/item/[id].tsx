@@ -1,15 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../src/components/Button';
-import { getItems, removeItem, touchItem, updateItem } from '../../src/items/store';
+import { getItems, removeItem, subscribe, touchItem, updateItem } from '../../src/items/store';
 import { pushToRemote } from '../../src/items/sync';
-import { daysUntilExpiry, getExpiryStatus } from '../../src/items/types';
+import { daysUntilExpiry, getExpiryStatus, type Item } from '../../src/items/types';
 import { colors, spacing } from '../../src/theme/colors';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const item = getItems().find((c) => c.id === id);
+  const [item, setItem] = useState<Item | undefined>(() =>
+    getItems().find((c) => c.id === id),
+  );
+
+  useEffect(() => {
+    const refresh = () => setItem(getItems().find((c) => c.id === id));
+    refresh();
+    return subscribe(refresh);
+  }, [id]);
 
   if (!item) {
     return (

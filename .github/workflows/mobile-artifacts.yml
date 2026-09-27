@@ -159,10 +159,13 @@ jobs:
 
       - name: Package IPA for SideStore
         working-directory: ${{ github.workspace }}
+        env:
+          INPUT_BUILD: ${{ inputs.build_number }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           VERSION="$(node -p "require('./mobile/app.json').expo.version")"
-          BUILD="${{ inputs.build_number || github.run_number }}"
+          BUILD="${INPUT_BUILD:-$RUN_NUMBER}"
           APP_PATH="mobile/ios/build/Build/Products/Release-iphoneos/Foodie.app"
           mkdir -p "dist/${VERSION}"
           chmod +x scripts/package-ios-ipa-for-sidestore.sh
@@ -258,6 +261,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download IPA
         uses: actions/download-artifact@v4
@@ -267,13 +272,16 @@ jobs:
 
       - name: Stage release files
         id: stage
+        env:
+          INPUT_BUILD: ${{ inputs.build_number }}
+          INPUT_FLAVOR: ${{ inputs.flavor }}
         run: |
           set -euo pipefail
           mkdir -p release/ios
           find ./artifacts -name '*.ipa' -exec cp {} release/ios/ \;
           VERSION="$(node -p "require('./mobile/app.json').expo.version")"
-          BUILD="${{ inputs.build_number || github.run_number }}"
-          FLAVOR="${{ inputs.flavor }}"
+          BUILD="${INPUT_BUILD:-${{ github.run_number }}}"
+          FLAVOR="${INPUT_FLAVOR}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
           echo "tag=${FLAVOR}-v${VERSION}-build${BUILD}" >> "$GITHUB_OUTPUT"

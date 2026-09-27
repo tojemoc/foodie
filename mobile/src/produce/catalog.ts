@@ -330,9 +330,18 @@ export function findProduceById(id: string): ProduceEntry | undefined {
 
 export function findProduceByAlias(label: string): ProduceEntry | undefined {
   const needle = label.trim().toLowerCase();
-  return PRODUCE_CATALOG.find(
-    (p) =>
-      p.name.toLowerCase() === needle ||
-      p.aliases.some((a) => a === needle || needle.includes(a) || a.includes(needle)),
-  );
+  if (!needle) return undefined;
+  return PRODUCE_CATALOG.find((p) => {
+    if (p.name.toLowerCase() === needle) return true;
+    return p.aliases.some((a) => {
+      const alias = a.toLowerCase();
+      return alias === needle || wholeWordMatch(needle, alias);
+    });
+  });
+}
+
+/** True when `alias` appears as a whole word inside `label`. */
+function wholeWordMatch(label: string, alias: string): boolean {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(label);
 }
