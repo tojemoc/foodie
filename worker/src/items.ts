@@ -2,12 +2,12 @@ import type { Env, Item, Tombstone } from './types.js';
 import { jsonResponse }              from './lib/http.js';
 import { verifyToken }               from './auth/jwt.js';
 import {
-  getItems      as kvGetItems,
-  putItems      as kvPutItems,
-  getTombstones as kvGetTombstones,
+  getItems         as kvGetItems,
+  putItems         as kvPutItems,
+  getTombstones    as kvGetTombstones,
+  mergeTombstones,
+  pruneTombstones,
 } from './lib/kv.js';
-
-const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function getItems(request: Request, env: Env): Promise<Response> {
   const { userId, error } = await verifyToken(request, env);
@@ -66,16 +66,3 @@ export async function setCardsLegacy(
   return setItems(request, env, ctx);
 }
 
-function mergeTombstones(a: Tombstone[], b: Tombstone[]): Tombstone[] {
-  const map = new Map<string, Tombstone>();
-  for (const t of [...a, ...b]) {
-    const ex = map.get(t.id);
-    if (!ex || t.deletedAt < ex.deletedAt) map.set(t.id, t);
-  }
-  return Array.from(map.values());
-}
-
-function pruneTombstones(tombstones: Tombstone[]): Tombstone[] {
-  const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
-  return tombstones.filter(t => new Date(t.deletedAt).getTime() > cutoff);
-}

@@ -58,6 +58,23 @@ export async function getItems(env: Env, userId: string): Promise<Item[] | null>
   return env.FOODIE_KV.get<Item[]>(`cards:${userId}`, 'json');
 }
 
+const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Merge by earliest deletedAt (same rule as item POST handlers). */
+export function mergeTombstones(a: Tombstone[], b: Tombstone[]): Tombstone[] {
+  const map = new Map<string, Tombstone>();
+  for (const t of [...a, ...b]) {
+    const ex = map.get(t.id);
+    if (!ex || t.deletedAt < ex.deletedAt) map.set(t.id, t);
+  }
+  return Array.from(map.values());
+}
+
+export function pruneTombstones(tombstones: Tombstone[]): Tombstone[] {
+  const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
+  return tombstones.filter(t => new Date(t.deletedAt).getTime() > cutoff);
+}
+
 /**
  * Per-isolate write coalescer — rapid saves keep only the latest payload.
  * Items and tombstones share one queue so a POST’s pair stays in sync when
@@ -67,6 +84,12 @@ type PendingWrite = {
   env: Env;
   items?: Item[];
   tombstones?: Tombstone[];
+  /**
+   * When true, flush re-reads KV and merges queued tombstones (putItems path).
+   * When false, write the exact latest list (putTombstones), even if coalesced
+   * onto an item batch.
+   */
+  mergeTombstonesOnFlush?: boolean;
   waiters: Array<{ resolve: () => void; reject: (err: unknown) => void }>;
 };
 const pendingWrites = new Map<string, PendingWrite>();
@@ -74,20 +97,30 @@ const flushing = new Set<string>();
 
 function enqueueWrite(
   userId: string,
-  patch: { env: Env; items?: Item[]; tombstones?: Tombstone[] },
+  patch: {
+    env: Env;
+    items?: Item[];
+    tombstones?: Tombstone[];
+    mergeTombstonesOnFlush?: boolean;
+  },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const existing = pendingWrites.get(userId);
     if (existing) {
       existing.env = patch.env;
       if (patch.items !== undefined) existing.items = patch.items;
-      if (patch.tombstones !== undefined) existing.tombstones = patch.tombstones;
+      if (patch.tombstones !== undefined) {
+        existing.tombstones = patch.tombstones;
+        // Last tombstone writer wins exact-vs-merge semantics.
+        existing.mergeTombstonesOnFlush = patch.mergeTombstonesOnFlush;
+      }
       existing.waiters.push({ resolve, reject });
     } else {
       pendingWrites.set(userId, {
         env: patch.env,
         items: patch.items,
         tombstones: patch.tombstones,
+        mergeTombstonesOnFlush: patch.mergeTombstonesOnFlush,
         waiters: [{ resolve, reject }],
       });
     }
@@ -101,7 +134,13 @@ export function putItems(
   items: Item[],
   tombstones?: Tombstone[],
 ): Promise<void> {
-  return enqueueWrite(userId, { env, items, tombstones });
+  return enqueueWrite(userId, {
+    env,
+    items,
+    tombstones,
+    // Item batches re-merge against KV on flush so coalesced POSTs cannot drop deletes.
+    mergeTombstonesOnFlush: tombstones !== undefined ? true : undefined,
+  });
 }
 
 async function flushInventoryWrites(userId: string): Promise<void> {
@@ -118,9 +157,15 @@ async function flushInventoryWrites(userId: string): Promise<void> {
           await batch.env.FOODIE_KV.delete(`cards:${userId}`);
         }
         if (batch.tombstones !== undefined) {
+          let toWrite = batch.tombstones;
+          if (batch.mergeTombstonesOnFlush) {
+            const stored =
+              (await batch.env.FOODIE_KV.get<Tombstone[]>(`tombstones:${userId}`, 'json')) ?? [];
+            toWrite = pruneTombstones(mergeTombstones(stored, batch.tombstones));
+          }
           await batch.env.FOODIE_KV.put(
             `tombstones:${userId}`,
-            JSON.stringify(batch.tombstones),
+            JSON.stringify(toWrite),
           );
         }
         for (const w of batch.waiters) w.resolve();
@@ -207,13 +252,17 @@ export async function deletePushSubscription(
 export const getTombstones = (env: Env, userId: string) =>
   env.FOODIE_KV.get<Tombstone[]>(`tombstones:${userId}`, 'json');
 
-/** Coalesced like putItems — rapid POSTs keep only the latest tombstone list. */
+/** Coalesced like putItems — writes the exact latest list (no KV re-merge). */
 export function putTombstones(
   env: Env,
   userId: string,
   tombstones: Tombstone[],
 ): Promise<void> {
-  return enqueueWrite(userId, { env, tombstones });
+  return enqueueWrite(userId, {
+    env,
+    tombstones,
+    mergeTombstonesOnFlush: false,
+  });
 }
 
 // ── User upsert (shared by passkey + magic link registration) ─────────────────
