@@ -49,7 +49,7 @@ export default defineConfig({
           },
         ],
         // Never cache Worker API calls
-        navigateFallbackDenylist: [/^\/auth\//, /^\/cards/],
+        navigateFallbackDenylist: [/^\/auth\//, /^\/items/, /^\/cards/],
       },
     }),
   ],
@@ -62,8 +62,8 @@ export default defineConfig({
           if (id.includes('src/auth/passkey.ts') || id.includes('src/auth/magic.ts') || id.includes('src/auth/session.ts')) {
             return 'auth';
           }
-          if (id.includes('src/cards/store.ts') || id.includes('src/cards/sync.ts') || id.includes('src/cards/merge.ts')) {
-            return 'cards';
+          if (id.includes('src/items/store.ts') || id.includes('src/items/sync.ts') || id.includes('src/items/merge.ts')) {
+            return 'items';
           }
         },
       },

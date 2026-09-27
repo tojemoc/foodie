@@ -1,36 +1,36 @@
-import type { Card } from '../types.js';
+import type { Item } from '../types.js';
 import { showToast } from '../ui/toast.js';
 
 const LAST_NOTICE_KEY = 'foodie_v2_expiry_notice';
 
-export function notifyExpiring(cards: Card[]): void {
+export function notifyExpiring(items: Item[]): void {
   if (typeof Notification === 'undefined') return;
 
   const now = new Date();
 
-  const soon = cards
+  const soon = items
     .filter(c => !!c.expiryDate)
-    .map(c => ({ card: c, days: calendarDaysUntilExpiry(c.expiryDate!, now) }))
+    .map(c => ({ item: c, days: calendarDaysUntilExpiry(c.expiryDate!, now) }))
     .filter(x => x.days !== null)
-    .map(x => ({ card: x.card, days: x.days as number }))
+    .map(x => ({ item: x.item, days: x.days as number }))
     .filter(x => x.days >= -1 && x.days <= 3)
     .sort((a, b) => {
-      const da = parseIsoLocalMidnight(a.card.expiryDate!)!.getTime();
-      const db = parseIsoLocalMidnight(b.card.expiryDate!)!.getTime();
+      const da = parseIsoLocalMidnight(a.item.expiryDate!)!.getTime();
+      const db = parseIsoLocalMidnight(b.item.expiryDate!)!.getTime();
       return da - db;
     });
 
   if (!soon.length) return;
 
   const dayBucket = todayLocalIso(now);
-  const signature = `${dayBucket}|${soon.map(s => `${s.card.id}:${s.card.expiryDate}`).join('|')}`;
+  const signature = `${dayBucket}|${soon.map(s => `${s.item.id}:${s.item.expiryDate}`).join('|')}`;
   const last = localStorage.getItem(LAST_NOTICE_KEY);
   if (last === signature) return;
 
   const send = () => {
     const first = soon[0]!;
     const firstDays = first.days;
-    const name = first.card.productName || first.card.name;
+    const name = first.item.productName || first.item.name;
     const body =
       firstDays < 0
         ? `${name} expired ${Math.abs(firstDays)} day(s) ago`

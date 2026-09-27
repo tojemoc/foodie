@@ -1,6 +1,6 @@
-import type { Env, User, Card } from '../types.js';
+import type { Env, User, Item } from '../types.js';
 import {
-  getCards as kvGetCards,
+  getItems as kvGetItems,
   getPushSubscriptions,
   deletePushSubscription,
 } from '../lib/kv.js';
@@ -44,8 +44,8 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       const user = await env.FOODIE_KV.get<User>(key, 'json');
       if (!user?.email) continue;
 
-      const cards = (await kvGetCards(env, userId)) ?? [];
-      const expiring = filterExpiringSoon(cards);
+      const items = (await kvGetItems(env, userId)) ?? [];
+      const expiring = filterExpiringSoon(items);
       if (!expiring.length) continue;
 
       processed++;
@@ -117,12 +117,12 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
   return sent;
 }
 
-function filterExpiringSoon(cards: Card[]): ExpiringRow[] {
+function filterExpiringSoon(items: Item[]): ExpiringRow[] {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const out: ExpiringRow[] = [];
 
-  for (const c of cards) {
+  for (const c of items) {
     if (!c.expiryDate) continue;
     const d = parseIsoDateUtc(c.expiryDate);
     if (!d) continue;

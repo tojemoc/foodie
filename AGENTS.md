@@ -1,74 +1,72 @@
 # Foodie — Food & Grocery Tracker
 
-PWA food / grocery tracker with passkey + magic-link auth and Cloudflare KV sync. Two packages: Vite frontend (repo root) and Cloudflare Worker API (`worker/`).
+PWA + Expo native food / grocery tracker with passkey + magic-link auth and Cloudflare KV sync.
 
-**Version:** `2.1.4` · Vanilla TypeScript (not React) · long-term goal: native mobile app on a stable Worker API.
+**Versions:** PWA `2.1.4` · Mobile `3.0.0`  
+**Packages:** Vite PWA (repo root) · Expo app (`mobile/`) · Cloudflare Worker API (`worker/`).
 
 ## Project status (for agents)
 
 ### How we got here
-1. **React PoC** — Vite + React grocery expiry PWA (ZXing, Tesseract OCR, Dexie IndexedDB, Open Food Facts). Proved scan → place → track; stayed local-only.
-2. **Architecture reset** — Repo switched to the **Cardex** vanilla-TS shell (passkey/magic-link + KV sync + offline cache). Auth/sync mattered more than keeping the React PoC.
-3. **Rebrand + product** — Cardex rebranded to **Foodie**; grocery features rebuilt on that shell (wizard, scan, OCR, digests, expiry UI).
+1. **React PoC** — Vite + React grocery expiry PWA (ZXing, Tesseract, Dexie, Open Food Facts).
+2. **Architecture reset** — Repo switched to the **Cardex** vanilla-TS shell (passkey/magic-link + KV sync).
+3. **Rebrand + PWA product** — Cardex → Foodie; grocery features on that shell.
+4. **Native Expo rewrite** — PWA camera/OCR/iOS install fragility pushed a SideStore-installable React Native client that reuses the Worker API. Patterns borrowed from the early React PoC and `tojemoc/vmp`’s Expo mobile app.
 
 ### Landed features
-- Passkey (WebAuthn) + magic link (Brevo) + JWT session gate
-- Cloud-primary KV sync, localStorage offline cache, LWW merge + tombstones
-- Add/edit/delete, search, JSON export/import, placement wizard, fresh-item templates
-- Barcode scan (`BarcodeDetector` + ZXing), Open Food Facts lookup, expiry OCR (Tesseract.js)
-- Expiry-focused UI, in-app + Web Push expiry notifications, daily Worker cron digest (email + push)
-- Staging/production GitHub Actions, Dependabot auto-merge, iOS PWA auth hint
+- Passkey (WebAuthn) + magic link (Brevo) + JWT session gate (PWA)
+- Cloud-primary KV sync, LWW merge + tombstones (PWA + mobile)
+- Expo mobile: barcode scan, multi-format best-before parser (no LLM), multi-source product lookup + cache, offline produce catalog / photo recognition
+- SideStore IPA workflow (`.github/workflows/mobile-artifacts.yml`)
+- PWA: placement wizard, Web Push + morning digest, staging/prod CI
 
 ### Roadmap
-- Near term: passkey list/revoke, install CTA, shared/family inventories, prod hardening, optional vision-model OCR
-- **Long term: native iOS/Android app** — PWA is intentional first; keep Worker API + card schema stable so a native client (Capacitor / RN / native) can reuse them
+- GitHub Pages AltStore source hosting, ML Kit OCR in prebuild, shared inventories, prod hardening
+- Keep Worker `/items` schema stable for all clients (`/cards` is a legacy alias)
 
-Prefer reading `README.md` for the full narrative and deploy URLs.
+Prefer reading `README.md` and `mobile/README.md`.
 
 ## Cursor Cloud specific instructions
 
 ### Project structure
-- **Frontend** (root): Vanilla TypeScript + Vite 8, PWA via `vite-plugin-pwa`. Dev server: `npm run dev` → `http://localhost:5173`
-- **Worker API** (`worker/`): Cloudflare Worker + Wrangler 4. Dev server: `cd worker && npm run dev` → `http://localhost:8787` (local KV emulated by Miniflare). Existing `wrangler.toml` and deploy scripts are v4-compatible.
+- **PWA** (root): Vanilla TypeScript + Vite 8. Dev: `npm run dev` → `http://localhost:5173`
+- **Mobile** (`mobile/`): Expo 57 + Expo Router. Dev: `cd mobile && npx expo start`
+- **Worker API** (`worker/`): Cloudflare Worker + Wrangler 4. Dev: `cd worker && npm run dev` → `http://localhost:8787`
 
 ### Local environment files (not committed)
-- `.env.local` at root — must contain `VITE_API_URL=http://localhost:8787`
-- `worker/.dev.vars` — must contain `JWT_SECRET=<any-random-string>`, and for Web Push also `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` (see README for generation). Optionally `BREVO_API_KEY` for magic-link + digest email.
+- `.env.local` at root — `VITE_API_URL=http://localhost:8787`
+- `mobile/.env.local` — `EXPO_PUBLIC_API_URL=http://127.0.0.1:8787` (use LAN IP on a physical device)
+- `worker/.dev.vars` — `JWT_SECRET=…`, optional VAPID + `BREVO_API_KEY`
 
 ### Running dev servers
-Start both servers — order doesn't matter:
 ```
-# Terminal 1 — Worker API
+# Worker
 cd worker && npm run dev
 
-# Terminal 2 — Frontend
+# PWA
 npm run dev
+
+# Mobile (separate terminal)
+cd mobile && EXPO_PUBLIC_API_URL=http://127.0.0.1:8787 npx expo start
 ```
-The worker uses `wrangler dev` which emulates KV locally in `.wrangler/` — no Cloudflare account needed for local dev.
 
-### Lint / type-check
-- Frontend: `npm run type-check`
+### Lint / type-check / test
+- PWA: `npm run type-check`
 - Worker: `cd worker && npm run type-check`
-- No ESLint or Prettier configured in this repo.
-
-### Build
-- `npm run build` (`tsc && vite build`) — `manualChunks` in `vite.config.ts` is already a function (Rolldown-compatible). If build fails, check Vite/Rolldown peer issues and `vite-plugin-pwa` first.
-- Dev server is the reliable local path regardless.
-
-### CORS for local dev
-The worker reads `Origin` and reflects it in CORS responses. `http://localhost:5173` works with `wrangler dev`.
+- Mobile: `cd mobile && npm run typecheck && npm test`
+- No ESLint/Prettier at repo root.
 
 ### Dependencies
-- `npm install --legacy-peer-deps` at root (`vite-plugin-pwa@1.x` peer range does not cover `vite@8`).
-- `npm install` in `worker/` needs no special flags.
+- Root: `npm install --legacy-peer-deps`
+- `mobile/` and `worker/`: plain `npm install` / `npm ci`
 
-### Passkey auth on localhost
-Chrome allows WebAuthn on `localhost` without HTTPS. The worker’s `FRONTEND_RP_ID` in `wrangler.toml` usually points at staging/prod; passkey registration may fail locally with an RP ID mismatch. Item CRUD works fully in offline/localStorage mode without authentication.
-
-### Web Push on localhost
-Chrome supports Web Push on `localhost`. iOS requires an installed Home Screen PWA (Settings → Expiry alerts explains this). Push handlers live in `public/sw-push.js` and are loaded via Workbox `importScripts`.
+### Passkey / SideStore notes
+- Passkeys: PWA / localhost RP ID caveats still apply.
+- Mobile auth: magic link + deep link `foodie://` / Universal Links.
+- SideStore: see `docs/ios-sidestore-distribution-playbook.md`. IPA builds need the macOS job in `mobile-artifacts.yml`.
 
 ### Deploy reminders
 - Staging: push to `main` → `.github/workflows/staging.yml`
 - Production: tag `v*` → `.github/workflows/release.yml`
-- Cron digest: `[triggers] crons = ["0 6 * * *"]` in `worker/wrangler.toml`; requires `BREVO_API_KEY` and/or VAPID keys for email/push respectively
+- Mobile IPA: workflow_dispatch → `.github/workflows/mobile-artifacts.yml`
+- Cron digest: `[triggers] crons = ["0 6 * * *"]` in `worker/wrangler.toml`

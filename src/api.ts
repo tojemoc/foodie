@@ -1,4 +1,4 @@
-import type { Card, Tombstone, AuthResponse } from './types.js';
+import type { Item, Tombstone, AuthResponse } from './types.js';
 
 // ⚠️  Set this to your deployed Worker URL
 export const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8787').replace(/\/$/, '');
@@ -36,10 +36,10 @@ export const authMagicSend      = (email: string)    => request<{ ok: boolean; e
 export const authMagicVerify    = (token: string)    => request<AuthResponse>('/auth/magic/verify', 'POST', { token });
 export const authMe             = ()                  => request<{ id: string; username: string; email: string }>('/auth/me', 'GET');
 
-// ── Cards ─────────────────────────────────────────────────────────────────────
+// ── Items ─────────────────────────────────────────────────────────────────────
 
-export const fetchCards = ()                                        => request<{ cards: Card[]; tombstones: Tombstone[]; error?: string }>('/cards', 'GET');
-export const pushCards  = (cards: Card[], tombstones: Tombstone[]) => request<{ ok: boolean; error?: string }>('/cards', 'POST', { cards, tombstones });
+export const fetchItems = ()                                        => request<{ items: Item[]; tombstones: Tombstone[]; error?: string }>('/items', 'GET');
+export const pushItems  = (items: Item[], tombstones: Tombstone[]) => request<{ ok: boolean; error?: string }>('/items', 'POST', { items, tombstones });
 
 // ── Web Push ──────────────────────────────────────────────────────────────────
 

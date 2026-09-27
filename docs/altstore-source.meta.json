@@ -1,0 +1,28 @@
+{
+  "name": "Foodie",
+  "subtitle": "Grocery expiry tracker for SideStore",
+  "description": "Foodie tracks food and grocery expiry with on-device barcode scan, best-before OCR, multi-source product lookup, and offline produce recognition. IPAs are packaged for SideStore / AltStore.",
+  "iconURL": "https://raw.githubusercontent.com/tojemoc/foodie/main/public/icon-192.png",
+  "website": "https://github.com/tojemoc/foodie",
+  "tintColor": "#3DDC97",
+  "featuredApps": ["sk.tjm.foodie"],
+  "news": [],
+  "app": {
+    "name": "Foodie",
+    "bundleIdentifier": "sk.tjm.foodie",
+    "developerName": "tojemoc",
+    "subtitle": "Food & grocery expiry tracker",
+    "localizedDescription": "Scan barcodes, read best-before dates on-device, recognize produce from photos using a bundled offline catalog, and sync via the Foodie Worker API. Install with SideStore or AltStore.",
+    "iconURL": "https://raw.githubusercontent.com/tojemoc/foodie/main/public/icon-192.png",
+    "tintColor": "#3DDC97",
+    "category": "utilities",
+    "screenshots": [],
+    "appPermissions": {
+      "entitlements": [],
+      "privacy": {
+        "NSCameraUsageDescription": "Foodie scans barcodes, best-before dates, and produce photos."
+      }
+    },
+    "patreon": {}
+  }
+}
