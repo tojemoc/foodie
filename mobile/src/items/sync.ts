@@ -2,6 +2,7 @@ import { fetchItems, pushItems } from '../api/client';
 import { mergeItems } from './merge';
 import {
   getItems,
+  getStorageGeneration,
   getTombstones,
   setItems,
   setTombstones,
@@ -21,10 +22,12 @@ function setStatus(status: SyncStatus, message?: string): void {
 }
 
 export async function syncOnOpen(): Promise<void> {
+  const gen = getStorageGeneration();
   setStatus('syncing', 'Syncing…');
   try {
     const { items: remoteItems, tombstones: remoteTombstones, error } = await fetchItems();
     if (error) throw new Error(error);
+    if (gen !== getStorageGeneration()) return;
 
     const { items, tombstones } = mergeItems(
       getItems(),
@@ -32,6 +35,8 @@ export async function syncOnOpen(): Promise<void> {
       getTombstones(),
       remoteTombstones ?? [],
     );
+
+    if (gen !== getStorageGeneration()) return;
 
     setItems(items);
     setTombstones(tombstones);
@@ -41,22 +46,33 @@ export async function syncOnOpen(): Promise<void> {
       JSON.stringify(tombstones) !== JSON.stringify(remoteTombstones ?? []);
 
     if (itemsChanged || tombstonesChanged) {
-      await pushToRemote();
-    } else {
+      await pushToRemote(gen);
+    } else if (gen === getStorageGeneration()) {
       setStatus('synced', 'Synced');
     }
   } catch {
-    setStatus('offline', 'Offline — local inventory');
+    if (gen === getStorageGeneration()) {
+      setStatus('offline', 'Offline — local inventory');
+    }
   }
 }
 
-export async function pushToRemote(): Promise<void> {
+export async function pushToRemote(expectedGen?: number): Promise<void> {
+  const gen = expectedGen ?? getStorageGeneration();
+  if (gen !== getStorageGeneration()) return;
+
   setStatus('syncing', 'Saving…');
   try {
-    const { error } = await pushItems(getItems(), getTombstones());
+    const items = getItems();
+    const tombstones = getTombstones();
+    if (gen !== getStorageGeneration()) return;
+
+    const { error } = await pushItems(items, tombstones);
     if (error) throw new Error(error);
-    setStatus('synced', 'Synced');
+    if (gen === getStorageGeneration()) setStatus('synced', 'Synced');
   } catch {
-    setStatus('error', 'Sync failed — changes kept locally');
+    if (gen === getStorageGeneration()) {
+      setStatus('error', 'Sync failed — changes kept locally');
+    }
   }
 }

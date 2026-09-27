@@ -58,30 +58,53 @@ export async function getItems(env: Env, userId: string): Promise<Item[] | null>
   return env.FOODIE_KV.get<Item[]>(`cards:${userId}`, 'json');
 }
 
-/** Per-isolate write coalescer — rapid saves keep only the latest payload. */
+/**
+ * Per-isolate write coalescer — rapid saves keep only the latest payload.
+ * Items and tombstones share one queue so a POST’s pair stays in sync when
+ * later requests coalesce over it.
+ */
 type PendingWrite = {
   env: Env;
-  items: Item[];
+  items?: Item[];
+  tombstones?: Tombstone[];
   waiters: Array<{ resolve: () => void; reject: (err: unknown) => void }>;
 };
 const pendingWrites = new Map<string, PendingWrite>();
 const flushing = new Set<string>();
 
-export function putItems(env: Env, userId: string, items: Item[]): Promise<void> {
+function enqueueWrite(
+  userId: string,
+  patch: { env: Env; items?: Item[]; tombstones?: Tombstone[] },
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const existing = pendingWrites.get(userId);
     if (existing) {
-      existing.env = env;
-      existing.items = items;
+      existing.env = patch.env;
+      if (patch.items !== undefined) existing.items = patch.items;
+      if (patch.tombstones !== undefined) existing.tombstones = patch.tombstones;
       existing.waiters.push({ resolve, reject });
     } else {
-      pendingWrites.set(userId, { env, items, waiters: [{ resolve, reject }] });
+      pendingWrites.set(userId, {
+        env: patch.env,
+        items: patch.items,
+        tombstones: patch.tombstones,
+        waiters: [{ resolve, reject }],
+      });
     }
-    void flushItemWrites(userId);
+    void flushInventoryWrites(userId);
   });
 }
 
-async function flushItemWrites(userId: string): Promise<void> {
+export function putItems(
+  env: Env,
+  userId: string,
+  items: Item[],
+  tombstones?: Tombstone[],
+): Promise<void> {
+  return enqueueWrite(userId, { env, items, tombstones });
+}
+
+async function flushInventoryWrites(userId: string): Promise<void> {
   if (flushing.has(userId)) return;
   flushing.add(userId);
   try {
@@ -89,9 +112,17 @@ async function flushItemWrites(userId: string): Promise<void> {
       const batch = pendingWrites.get(userId)!;
       pendingWrites.delete(userId);
       try {
-        await batch.env.FOODIE_KV.put(`items:${userId}`, JSON.stringify(batch.items));
-        // Drop legacy key after a successful write so digests/clients converge.
-        await batch.env.FOODIE_KV.delete(`cards:${userId}`);
+        if (batch.items !== undefined) {
+          await batch.env.FOODIE_KV.put(`items:${userId}`, JSON.stringify(batch.items));
+          // Drop legacy key after a successful write so digests/clients converge.
+          await batch.env.FOODIE_KV.delete(`cards:${userId}`);
+        }
+        if (batch.tombstones !== undefined) {
+          await batch.env.FOODIE_KV.put(
+            `tombstones:${userId}`,
+            JSON.stringify(batch.tombstones),
+          );
+        }
         for (const w of batch.waiters) w.resolve();
       } catch (err) {
         for (const w of batch.waiters) w.reject(err);
@@ -176,8 +207,14 @@ export async function deletePushSubscription(
 export const getTombstones = (env: Env, userId: string) =>
   env.FOODIE_KV.get<Tombstone[]>(`tombstones:${userId}`, 'json');
 
-export const putTombstones = (env: Env, userId: string, tombstones: Tombstone[]) =>
-  env.FOODIE_KV.put(`tombstones:${userId}`, JSON.stringify(tombstones));
+/** Coalesced like putItems — rapid POSTs keep only the latest tombstone list. */
+export function putTombstones(
+  env: Env,
+  userId: string,
+  tombstones: Tombstone[],
+): Promise<void> {
+  return enqueueWrite(userId, { env, tombstones });
+}
 
 // ── User upsert (shared by passkey + magic link registration) ─────────────────
 

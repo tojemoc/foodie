@@ -5,7 +5,6 @@ import {
   getItems      as kvGetItems,
   putItems      as kvPutItems,
   getTombstones as kvGetTombstones,
-  putTombstones as kvPutTombstones,
 } from './lib/kv.js';
 
 const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -39,11 +38,11 @@ export async function setItems(
   const merged   = mergeTombstones(existing, incoming);
   const pruned   = pruneTombstones(merged);
 
-  const write = kvPutItems(env, userId, items);
+  // One coalesced write for items + tombstones so rapid POSTs stay paired.
+  const write = kvPutItems(env, userId, items, pruned);
   // Keep coalesced KV writes alive if the isolate would otherwise freeze after respond.
   ctx.waitUntil(write);
   await write;
-  await kvPutTombstones(env, userId, pruned);
 
   return jsonResponse({ ok: true, count: items.length }, 200, env);
 }

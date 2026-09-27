@@ -14,6 +14,8 @@ export type StorageNamespace =
   | { kind: 'account'; userId: string };
 
 let _namespace: StorageNamespace = { kind: 'anonymous' };
+/** Bumped on every namespace switch; async load/sync discard stale generations. */
+let _generation = 0;
 let _items: Item[] = [];
 let _tombstones: Tombstone[] = [];
 const listeners = new Set<() => void>();
@@ -41,6 +43,10 @@ export function getStorageNamespace(): StorageNamespace {
   return _namespace;
 }
 
+export function getStorageGeneration(): number {
+  return _generation;
+}
+
 /**
  * Switch the active local inventory namespace.
  * Does not merge data between namespaces — call loadFromStorage() after.
@@ -49,6 +55,7 @@ export async function selectStorageNamespace(ns: StorageNamespace): Promise<void
   _namespace = ns;
   _items = [];
   _tombstones = [];
+  _generation += 1;
 }
 
 export function getItems(): Item[] {
@@ -101,13 +108,18 @@ function pruneTombstones(): void {
 }
 
 export async function loadFromStorage(): Promise<Item[]> {
-  const iKey = itemsKey(_namespace);
-  const tKey = tombstoneKey(_namespace);
+  const gen = _generation;
+  const ns = _namespace;
+  const iKey = itemsKey(ns);
+  const tKey = tombstoneKey(ns);
+
+  let nextItems: Item[] = [];
+  let nextTombstones: Tombstone[] = [];
 
   try {
     let raw = await AsyncStorage.getItem(iKey);
     // One-time migration of pre-namespace inventory into the anonymous namespace.
-    if (!raw && _namespace.kind === 'anonymous') {
+    if (!raw && ns.kind === 'anonymous') {
       raw =
         (await AsyncStorage.getItem(LEGACY_ITEMS_KEY)) ??
         (await AsyncStorage.getItem(LEGACY_CARDS_KEY));
@@ -116,39 +128,48 @@ export async function loadFromStorage(): Promise<Item[]> {
         await AsyncStorage.multiRemove([LEGACY_ITEMS_KEY, LEGACY_CARDS_KEY]);
       }
     }
-    if (raw) _items = JSON.parse(raw) as Item[];
-    else _items = [];
+    if (raw) nextItems = JSON.parse(raw) as Item[];
   } catch {
-    _items = [];
+    nextItems = [];
   }
 
   try {
     let raw = await AsyncStorage.getItem(tKey);
-    if (!raw && _namespace.kind === 'anonymous') {
+    if (!raw && ns.kind === 'anonymous') {
       raw = await AsyncStorage.getItem(LEGACY_TOMBSTONE_KEY);
       if (raw) {
         await AsyncStorage.setItem(tKey, raw);
         await AsyncStorage.removeItem(LEGACY_TOMBSTONE_KEY);
       }
     }
-    if (raw) _tombstones = JSON.parse(raw) as Tombstone[];
-    else _tombstones = [];
-    pruneTombstones();
-    await persistTombstones();
+    if (raw) nextTombstones = JSON.parse(raw) as Tombstone[];
+    const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
+    nextTombstones = nextTombstones.filter(
+      (t) => new Date(t.deletedAt).getTime() > cutoff,
+    );
   } catch {
-    _tombstones = [];
+    nextTombstones = [];
   }
 
+  if (gen !== _generation) return _items;
+
+  _items = nextItems;
+  _tombstones = nextTombstones;
+  await AsyncStorage.setItem(tKey, JSON.stringify(_tombstones));
   notify();
   return _items;
 }
 
 async function persistItems(): Promise<void> {
-  await AsyncStorage.setItem(itemsKey(_namespace), JSON.stringify(_items));
+  const key = itemsKey(_namespace);
+  const payload = JSON.stringify(_items);
+  await AsyncStorage.setItem(key, payload);
 }
 
 async function persistTombstones(): Promise<void> {
-  await AsyncStorage.setItem(tombstoneKey(_namespace), JSON.stringify(_tombstones));
+  const key = tombstoneKey(_namespace);
+  const payload = JSON.stringify(_tombstones);
+  await AsyncStorage.setItem(key, payload);
 }
 
 export function makeItem(
