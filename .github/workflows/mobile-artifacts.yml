@@ -87,7 +87,10 @@ jobs:
 
   build-ios:
     needs: validate-mobile
-    runs-on: macos-15
+    # Expo SDK 57 / expo-modules-jsi requires Swift tools 6.2+ (Xcode 26.4+).
+    # macos-15 defaults to Xcode 16.4 (Swift 6.1) and fails with:
+    #   package 'apple' is using Swift tools version 6.2.0 but the installed version is 6.1.0
+    runs-on: macos-26
     timeout-minutes: 90
     defaults:
       run:
@@ -100,6 +103,33 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Select Xcode 26.4+
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          # Prefer the newest installed 26.4+ toolchain; fall back to image default.
+          candidates=(
+            /Applications/Xcode_26.5.app
+            /Applications/Xcode_26.4.1.app
+            /Applications/Xcode_26.4.app
+            /Applications/Xcode.app
+          )
+          selected=""
+          for app in "${candidates[@]}"; do
+            if [[ -d "$app" ]]; then
+              selected="$app"
+              break
+            fi
+          done
+          if [[ -z "$selected" ]]; then
+            echo "::error::No Xcode 26.x installation found (Expo SDK 57 requires Xcode 26.4+)."
+            ls /Applications/Xcode*.app || true
+            exit 1
+          fi
+          sudo xcode-select -s "$selected/Contents/Developer"
+          xcodebuild -version
+          xcrun swift --version
 
       - uses: actions/setup-node@v4
         with:

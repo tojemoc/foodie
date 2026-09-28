@@ -10,9 +10,14 @@ Required inputs:
 - `api_url` — Worker base URL baked into the binary
 - `frontend_host` — host used for Universal Links / App Links
 
-The macOS job runs `expo prebuild`, builds with
-`CODE_SIGNING_ALLOWED=NO`, then packages `Payload/Foodie.app` into
-`foodie-<version>-ios.ipa` via `scripts/package-ios-ipa-for-sidestore.sh`.
+The macOS job runs on `macos-26` (Xcode 26.4+ / Swift 6.2+), runs
+`expo prebuild`, builds with `CODE_SIGNING_ALLOWED=NO`, then packages
+`Payload/Foodie.app` into `foodie-<version>-ios.ipa` via
+`scripts/package-ios-ipa-for-sidestore.sh`.
+
+Expo SDK 57’s `expo-modules-jsi` declares `swift-tools-version: 6.2`, so
+`macos-15` (default Xcode 16.4 / Swift 6.1) fails during the
+ExpoModulesJSI XCFramework build.
 
 ## Install on iPhone
 
