@@ -464,10 +464,11 @@ jobs:
               --jq '.[] | select(.draft|not) | .tag_name' \
               | sed -nE 's/.*-v([0-9]+(\.[0-9]+)+)-build[0-9]+$/\1/p' \
               | node --input-type=module -e '
+                  import { createInterface } from "node:readline";
                   import { maxMarketingVersion } from "./scripts/ios-sidestore-marketing-version.mjs";
                   const versions = [];
-                  for await (const chunk of process.stdin) {
-                    versions.push(...String(chunk).split(/\r?\n/));
+                  for await (const line of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
+                    versions.push(line);
                   }
                   const best = maxMarketingVersion(versions);
                   process.stdout.write(best ?? "");
