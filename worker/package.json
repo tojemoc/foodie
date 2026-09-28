@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test test/**/*.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260927.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "wrangler": "^4.142.0"
   }

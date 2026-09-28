@@ -1,8 +1,16 @@
 import { registerWithPasskey }          from '../auth/passkey.js';
 import { loginWithPasskey }             from '../auth/passkey.js';
-import { sendMagicLink, verifyMagicToken, consumeMagicTokenFromUrl } from '../auth/magic.js';
+import {
+  sendMagicLink,
+  verifyMagicToken,
+  peekMagicTokenFromUrl,
+  stripMagicTokenFromUrl,
+  foodieDeepLinkForToken,
+} from '../auth/magic.js';
 import { saveSession, clearSession }   from '../auth/session.js';
 import type { AuthResponse }           from '../types.js';
+
+let pendingMagicToken: string | null = null;
 
 // ── Panel switching ───────────────────────────────────────────────────────────
 
@@ -27,12 +35,21 @@ export function showPanel(panel: Panel): void {
 
 export function showAuthScreen(): void {
   document.getElementById('auth-screen')!.style.display    = 'flex';
+  document.getElementById('magic-handoff')!.style.display   = 'none';
+  document.getElementById('magic-verifying')!.style.display = 'none';
+  document.getElementById('main-app')!.style.display        = 'none';
+}
+
+export function showHandoffScreen(): void {
+  document.getElementById('auth-screen')!.style.display    = 'none';
+  document.getElementById('magic-handoff')!.style.display   = 'flex';
   document.getElementById('magic-verifying')!.style.display = 'none';
   document.getElementById('main-app')!.style.display        = 'none';
 }
 
 export function showVerifyingScreen(): void {
   document.getElementById('auth-screen')!.style.display    = 'none';
+  document.getElementById('magic-handoff')!.style.display   = 'none';
   document.getElementById('magic-verifying')!.style.display = 'flex';
   document.getElementById('main-app')!.style.display        = 'none';
 }
@@ -133,16 +150,43 @@ export async function handleMagicSend(): Promise<void> {
   }
 }
 
-// ── Magic link verify (called on page load if ?magic= present) ────────────────
+// ── Magic link handoff (called on page load if ?magic= / ?token= present) ─────
+// Important: do NOT call /auth/magic/verify until the user chooses "Continue in
+// this browser". Opening the email link used to burn the one-time token before
+// the native app (or Paste / open verify) could redeem it.
 
-export async function handleMagicVerify(): Promise<AuthResponse | null> {
-  const token = consumeMagicTokenFromUrl();
+export function prepareMagicHandoff(): boolean {
+  const token = peekMagicTokenFromUrl();
+  if (!token) return false;
+
+  pendingMagicToken = token;
+  // Strip from the address bar so refresh doesn't look like a fresh open,
+  // but keep the token in memory for Open app / Continue web.
+  stripMagicTokenFromUrl();
+  showHandoffScreen();
+
+  const err = document.getElementById('magic-handoff-error');
+  if (err) {
+    err.textContent = '';
+    err.classList.remove('show');
+  }
+  return true;
+}
+
+export function openFoodieAppFromHandoff(): void {
+  if (!pendingMagicToken) return;
+  window.location.href = foodieDeepLinkForToken(pendingMagicToken);
+}
+
+export async function continueMagicInBrowser(): Promise<AuthResponse | null> {
+  const token = pendingMagicToken;
   if (!token) return null;
 
   showVerifyingScreen();
   try {
     const result = await verifyMagicToken(token);
     if (result.error) {
+      pendingMagicToken = null;
       showAuthScreen();
       showPanel('magic');
       showAuthError('magic',
@@ -152,6 +196,7 @@ export async function handleMagicVerify(): Promise<AuthResponse | null> {
       );
       return null;
     }
+    pendingMagicToken = null;
     return result;
   } catch {
     showAuthScreen();

@@ -3,7 +3,8 @@ import { syncOnOpen }                from './items/sync.js';
 import { loadFromLocalStorage, getItems } from './items/store.js';
 import {
   showPanel, showAuthScreen, handleRegister,
-  handleLogin, handleMagicSend, handleMagicVerify,
+  handleLogin, handleMagicSend, prepareMagicHandoff,
+  openFoodieAppFromHandoff, continueMagicInBrowser,
 } from './ui/auth.js';
 import {
   renderItems, filterByCategory, openDetail,
@@ -24,13 +25,8 @@ async function init(): Promise<void> {
 
   showStandaloneAuthHint();
 
-  // 1. Check for ?magic= token first
-  const magicResult = await handleMagicVerify();
-  if (magicResult) {
-    saveSession(magicResult);
-    await bootMainApp();
-    return;
-  }
+  // 1. Magic-link handoff (?magic= / ?token=) — do not redeem until confirmed
+  if (prepareMagicHandoff()) return;
 
   // 2. Restore existing session
   const session = loadSession();
@@ -88,6 +84,13 @@ function wire(): void {
   on('show-magic-login-2','click',() => showPanel('magic'));
   on('back-to-login',    'click', () => showPanel('login'));
   on('back-to-login-2',  'click', () => showPanel('login'));
+
+  // Magic handoff — open native app without consuming, or redeem in browser
+  on('magic-open-app-btn', 'click', () => openFoodieAppFromHandoff());
+  on('magic-continue-web-btn', 'click', async () => {
+    const r = await continueMagicInBrowser();
+    if (r) { saveSession(r); await bootMainApp(); }
+  });
 
   // Magic email — submit on Enter
   on('magic-email', 'keydown', (e) => {

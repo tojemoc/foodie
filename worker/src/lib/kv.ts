@@ -38,15 +38,37 @@ export async function getAndDeleteChallenge(
 
 // ── Magic link ────────────────────────────────────────────────────────────────
 
-export const putMagicLink = (env: Env, token: string, data: MagicLinkData) =>
-  env.FOODIE_KV.put(`magiclink:${token}`, JSON.stringify(data), { expirationTtl: 900 });
+const MAGIC_TTL_SEC = 900;
 
+export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void> {
+  const body = JSON.stringify(data);
+  await Promise.all([
+    env.FOODIE_KV.put(`magiclink:${data.token}`, body, { expirationTtl: MAGIC_TTL_SEC }),
+    env.FOODIE_KV.put(`magiccode:${data.code}`, body, { expirationTtl: MAGIC_TTL_SEC }),
+  ]);
+}
+
+/** Consume by long token or 6-digit passcode; clears both indexes. */
 export async function getAndDeleteMagicLink(
   env:   Env,
-  token: string,
+  tokenOrCode: string,
 ): Promise<MagicLinkData | null> {
-  const data = await env.FOODIE_KV.get<MagicLinkData>(`magiclink:${token}`, 'json');
-  if (data) await env.FOODIE_KV.delete(`magiclink:${token}`);
+  const raw = tokenOrCode.trim();
+  if (!raw) return null;
+
+  const isCode = /^\d{6}$/.test(raw);
+  const primaryKey = isCode ? `magiccode:${raw}` : `magiclink:${raw}`;
+  const data = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
+  if (!data) return null;
+
+  const token = data.token || (!isCode ? raw : '');
+  const code  = data.code || (isCode ? raw : '');
+  await Promise.all([
+    token ? env.FOODIE_KV.delete(`magiclink:${token}`) : Promise.resolve(),
+    code  ? env.FOODIE_KV.delete(`magiccode:${code}`)  : Promise.resolve(),
+    // Always clear the key we read in case of legacy records without token/code fields.
+    env.FOODIE_KV.delete(primaryKey),
+  ]);
   return data;
 }
 

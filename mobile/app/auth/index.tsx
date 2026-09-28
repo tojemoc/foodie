@@ -10,12 +10,14 @@ export default function AuthScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function onSend() {
     setLoading(true);
     setError('');
+    setDevCode('');
     const res = await sendMagicLink(email);
     setLoading(false);
     if (!res.ok) {
@@ -23,14 +25,15 @@ export default function AuthScreen() {
       return;
     }
     setSent(true);
+    if (res.code) setDevCode(res.code);
   }
 
   return (
     <View style={styles.screen}>
       <Text style={styles.title}>Foodie</Text>
       <Text style={styles.lead}>
-        Passwordless sign-in. We email a one-time link — open it on this device to sync
-        your inventory.
+        Passwordless sign-in. We email a one-time link and a 6-digit passcode —
+        open the foodie:// link on this device, or paste the passcode on Verify.
       </Text>
       <TextInput
         style={styles.input}
@@ -45,7 +48,9 @@ export default function AuthScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       {sent ? (
         <Text style={styles.ok}>
-          Link sent. Open it on this phone, or paste the token on the verify screen.
+          {devCode
+            ? `Dev / no-email mode — passcode ${devCode}. Use Paste / open verify.`
+            : 'Link sent. Open the foodie:// link or enter the 6-digit passcode on Verify. Do not open the web link in a browser first if you want the app session.'}
         </Text>
       ) : (
         <Button title="Email magic link" onPress={() => void onSend()} loading={loading} disabled={!email.includes('@')} />

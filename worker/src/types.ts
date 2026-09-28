@@ -24,6 +24,10 @@ export interface MagicLinkData {
   userId:  string;
   email:   string;
   expires: number;
+  /** Long URL / deep-link token (base64url). */
+  token:   string;
+  /** Six-digit passcode for SideStore / paste handoff. */
+  code:    string;
 }
 
 // ── Item shape (shared with clients) ─────────────────────────────────────────

@@ -18,7 +18,9 @@ const SESSION_KEY = 'foodie_session_v3';
 interface AuthContextValue {
   session: Session | null;
   ready: boolean;
-  sendMagicLink: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  sendMagicLink: (
+    email: string,
+  ) => Promise<{ ok: boolean; error?: string; code?: string; deepLink?: string }>;
   verifyMagicToken: (token: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
   continueOffline: () => void;
@@ -106,7 +108,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendMagicLink = useCallback(async (email: string) => {
-    return authMagicSend(email.trim().toLowerCase());
+    const res = await authMagicSend(email.trim().toLowerCase());
+    if (res.error || res.ok === false) {
+      return { ok: false, error: res.error ?? 'Could not send magic link' };
+    }
+    return {
+      ok: true as const,
+      code: typeof res.code === 'string' ? res.code : undefined,
+      deepLink: typeof res.deepLink === 'string' ? res.deepLink : undefined,
+    };
   }, []);
 
   const verifyMagicToken = useCallback(async (token: string) => {
