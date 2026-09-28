@@ -56,9 +56,9 @@ function clientIp(request: Request): string {
   );
 }
 
-/** Prefix ending after email so `a@b.co` cannot match keys for `a@b.com`. */
+/** Prefix ending after encoded email so delimiter-bearing addresses cannot collide. */
 function codeAttemptPrefix(ip: string, email: string): string {
-  return `magicfail:${ip}:${email}:`;
+  return `magicfail:${ip}:${encodeURIComponent(email)}:`;
 }
 
 /**

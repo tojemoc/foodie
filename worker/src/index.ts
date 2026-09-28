@@ -9,6 +9,8 @@ import { getPrefs, putPrefs }        from './prefs.js';
 import { getUser }                   from './lib/kv.js';
 import { runExpiryDigest }           from './scheduled/expiry-digest.js';
 
+export { MagicLinkGate } from './auth/magic-gate.js';
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(runExpiryDigest(env));

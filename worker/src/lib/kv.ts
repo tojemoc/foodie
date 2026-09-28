@@ -92,23 +92,7 @@ export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void>
   ]);
 }
 
-/**
- * Best-effort single-use claim via per-request KV slots.
- * Concurrent verifiers each write a claim key; only the lexicographically first
- * winner may consume the credential (Workers KV has no true CAS).
- * Returns the winning claim key, or null if this request lost the race.
- */
-async function claimMagicCredential(env: Env, primaryKey: string): Promise<string | null> {
-  const claimId = crypto.randomUUID();
-  const prefix = `magicclaim:${primaryKey}:`;
-  const claimKey = `${prefix}${claimId}`;
-  await env.FOODIE_KV.put(claimKey, '1', { expirationTtl: MAGIC_TTL_SEC });
-  const listed = await env.FOODIE_KV.list({ prefix });
-  const names = listed.keys.map(k => k.name).sort();
-  return names[0] === claimKey ? claimKey : null;
-}
-
-/** Consume by long token, or by email-scoped 6-digit passcode. */
+/** Consume by long token, or by email-scoped 6-digit passcode (atomic via DO). */
 export async function getAndDeleteMagicLink(
   env: Env,
   tokenOrCode: string,
@@ -127,26 +111,21 @@ export async function getAndDeleteMagicLink(
     primaryKey = `magiclink:${raw}`;
   }
 
-  // Claim before read so concurrent requests cannot both verify the same credential.
-  const claimKey = await claimMagicCredential(env, primaryKey);
-  if (!claimKey) return null;
+  // Peek only to route token + passcode to the same DO instance.
+  const peek = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
+  if (!peek?.token) return null;
 
-  const data = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
-  if (!data) {
-    // Release the claim so a later retry is not blocked until TTL expiry.
-    await env.FOODIE_KV.delete(claimKey);
-    return null;
-  }
-
-  const token = data.token || (!isCode ? raw : '');
-  const code  = data.code || (isCode ? raw : '');
-  const email = data.email || emailForCode?.trim().toLowerCase() || '';
-  await Promise.all([
-    token ? env.FOODIE_KV.delete(`magiclink:${token}`) : Promise.resolve(),
-    code && email ? env.FOODIE_KV.delete(magicCodeKey(email, code)) : Promise.resolve(),
-    env.FOODIE_KV.delete(primaryKey),
-  ]);
-  return data;
+  // Serialized consume keyed by token so link and passcode cannot both succeed.
+  const id = env.MAGIC_LINK_GATE.idFromName(peek.token);
+  const stub = env.MAGIC_LINK_GATE.get(id);
+  const res = await stub.fetch('https://magic-link-gate/consume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ primaryKey }),
+  });
+  if (!res.ok) return null;
+  const body = await res.json<{ data: MagicLinkData | null }>();
+  return body.data ?? null;
 }
 
 // ── Items (legacy KV key `cards:` still read for migration) ───────────────────

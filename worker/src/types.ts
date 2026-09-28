@@ -86,6 +86,8 @@ export interface Tombstone {
 
 export interface Env {
   FOODIE_KV:           KVNamespace;
+  /** Per-credential gate for atomic single-use magic-link / passcode consume. */
+  MAGIC_LINK_GATE:     DurableObjectNamespace;
   JWT_SECRET:          string;
   BREVO_API_KEY?:      string;
   /** When "1"/"true", missing BREVO_API_KEY may echo magic token/code for local testing. */

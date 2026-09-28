@@ -13,6 +13,15 @@ crons = ["0 * * * *"]
 binding = "FOODIE_KV"
 id      = "c10dfc1b686d4d95a207bc18f5f96573"
 
+# Atomic single-use magic-link / passcode consume (one DO per credential key).
+[[durable_objects.bindings]]
+name = "MAGIC_LINK_GATE"
+class_name = "MagicLinkGate"
+
+[[migrations]]
+tag = "v1-magic-link-gate"
+new_sqlite_classes = ["MagicLinkGate"]
+
 # ── Production vars ────────────────────────────────────────────
 [vars]
 FRONTEND_ORIGIN  = "https://foodie-prod.pages.dev"
@@ -45,6 +54,10 @@ name = "foodie-api-staging"
 [[env.staging.kv_namespaces]]
 binding = "FOODIE_KV"
 id      = "f14a4873b1144683b90317d75b6a79ab"
+
+[[env.staging.durable_objects.bindings]]
+name = "MAGIC_LINK_GATE"
+class_name = "MagicLinkGate"
 
 [env.staging.vars]
 FRONTEND_ORIGIN  = "https://foodie-staging.pages.dev"
