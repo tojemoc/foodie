@@ -103,10 +103,12 @@ def resolve_mobile_artifacts_run_id(repo: str, token: str | None, explicit: str 
         return int(explicit)
 
     workflow_path = ".github/workflows/mobile-artifacts.yml"
+    # Use completed (not success): Android can fail while publish still succeeds,
+    # and those runs must remain discoverable for Pages refresh.
     url = (
         f"https://api.github.com/repos/{repo}/actions/workflows/"
         f"{urllib.parse.quote(workflow_path, safe='')}/runs"
-        f"?branch=main&status=success&per_page=30"
+        f"?branch=main&status=completed&per_page=30"
     )
     runs = api_get_paginated(url, token, list_key="workflow_runs")
     for run in runs:
@@ -126,7 +128,7 @@ def resolve_mobile_artifacts_run_id(repo: str, token: str | None, explicit: str 
             )
             return int(run_id)
 
-    # Fallback: any successful main run that still has the iOS artifact
+    # Fallback: any completed main run that still has the iOS artifact
     # (needed before the first Pages-aware publish lands on main).
     for run in runs:
         run_id = run.get("id")
@@ -144,7 +146,7 @@ def resolve_mobile_artifacts_run_id(repo: str, token: str | None, explicit: str 
             return int(run_id)
 
     raise SystemExit(
-        f"Could not find a successful Mobile artifacts run on main with a "
+        f"Could not find a completed Mobile artifacts run on main with a "
         f"non-expired {IOS_ARTIFACT} artifact. Pass --run-id explicitly."
     )
 
