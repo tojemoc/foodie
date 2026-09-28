@@ -16,6 +16,8 @@ permissions:
   pages: write
   id-token: write
 
+# Shared with mobile-artifacts.yml publish job so feed generation → Pages
+# deploy cannot race across the two workflows.
 concurrency:
   group: publish-sidestore-pages
   cancel-in-progress: false

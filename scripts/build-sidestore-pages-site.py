@@ -127,6 +127,23 @@ def main() -> int:
         print(f"error: {source} is not a valid AltStore source", file=sys.stderr)
         return 1
 
+    apps = payload.get("apps")
+    if not isinstance(apps, list) or not apps:
+        print(f"error: {source} has no apps entry", file=sys.stderr)
+        return 1
+    app = apps[0]
+    if not isinstance(app, dict):
+        print(f"error: {source} apps[0] is not an object", file=sys.stderr)
+        return 1
+    versions = app.get("versions")
+    if not isinstance(versions, list) or not versions:
+        print(
+            f"error: {source} has no installable versions "
+            "(refusing to publish an empty SideStore feed)",
+            file=sys.stderr,
+        )
+        return 1
+
     owner = args.owner
     repo_name = args.repo_name
     if not owner or not repo_name:
@@ -152,13 +169,9 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    apps = payload.get("apps") or []
-    version_count = 0
-    if apps and isinstance(apps[0], dict):
-        version_count = len(apps[0].get("versions") or [])
     print(
         f"Wrote {site_dir}/ with altstore-source.json "
-        f"({version_count} version(s)) → {source_url}"
+        f"({len(versions)} version(s)) → {source_url}"
     )
     return 0
 

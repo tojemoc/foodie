@@ -287,6 +287,12 @@ jobs:
     if: ${{ inputs.publish_release }}
     needs: [build-ios]
     runs-on: ubuntu-latest
+    # Serialize AltStore feed generation → Pages deploy with the manual
+    # publish-sidestore-pages workflow. Workflow-level concurrency above still
+    # gates the rest of Mobile artifacts (build/validate) per ref.
+    concurrency:
+      group: publish-sidestore-pages
+      cancel-in-progress: false
     permissions:
       contents: write
       pages: write

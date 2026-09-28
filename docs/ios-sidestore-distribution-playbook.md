@@ -34,6 +34,12 @@ without adding a source.
 
 ## GitHub Pages source
 
+Before the first deploy, set **Settings → Pages → Build and deployment →
+Source** to **GitHub Actions**. `actions/configure-pages` does not enable
+Pages by itself. Switching Source back to a branch later can replace the
+Actions-published feed with whatever that branch serves (often a 404 or
+raw `/docs` content).
+
 Each **Mobile artifacts** run with `publish_release=true` regenerates
 `altstore-source.json` from GitHub Releases and deploys it to GitHub Pages
 (Actions deploy — no git push to a `gh-pages` branch).
