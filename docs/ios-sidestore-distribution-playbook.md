@@ -32,6 +32,16 @@ ExpoModulesJSI XCFramework build.
 You can also sideload a downloaded IPA artifact directly in SideStore
 without adding a source.
 
+## GitHub Pages source
+
+Each **Mobile artifacts** run with `publish_release=true` regenerates
+`altstore-source.json` from GitHub Releases and deploys it to GitHub Pages
+(Actions deploy — no git push to a `gh-pages` branch).
+
+To refresh the source without rebuilding the IPA (for example after a
+mistaken re-run of GitHub’s dynamic `pages-build-deployment` wiped the
+site), run **Actions → Publish SideStore Pages** from `main`.
+
 ## Refresh
 
 Free Apple IDs expire apps about every 7 days. Open SideStore on the same

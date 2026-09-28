@@ -38,10 +38,10 @@ npm test
 ## SideStore
 
 1. Run **Actions → Mobile artifacts → Run workflow** from `main` (or a feature branch with `publish_release=false`).
-2. Download the IPA artifact, or enable publish to create a GitHub Release + `docs/altstore-source.json`.
+2. Download the IPA artifact, or enable publish to create a GitHub Release and deploy `altstore-source.json` to GitHub Pages.
 3. In SideStore: **Sources → +** and add  
    `https://<owner>.github.io/foodie/altstore-source.json`  
-   (after Pages is wired to serve that file).
+   (republish without an IPA rebuild via **Actions → Publish SideStore Pages**).
 
 Unsigned IPAs are re-signed by SideStore with your personal Apple ID.
 
