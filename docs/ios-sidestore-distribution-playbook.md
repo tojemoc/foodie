@@ -10,6 +10,12 @@ Required inputs:
 - `api_url` — Worker base URL baked into the binary
 - `frontend_host` — host used for Universal Links / App Links
 
+Optional:
+
+- `build_number` — defaults to the GitHub Actions **run number**. Published
+  marketing version becomes `major.minor.<build>` (from `mobile/app.json`
+  base + that build). A new IPA needs a unique flavor+version+build.
+
 The macOS job runs on `macos-26` (Xcode 26.4+ / Swift 6.2+), runs
 `expo prebuild`, builds with `CODE_SIGNING_ALLOWED=NO`, then packages
 `Payload/Foodie.app` into `foodie-<version>-ios.ipa` via
@@ -18,6 +24,37 @@ The macOS job runs on `macos-26` (Xcode 26.4+ / Swift 6.2+), runs
 Expo SDK 57’s `expo-modules-jsi` declares `swift-tools-version: 6.2`, so
 `macos-15` (default Xcode 16.4 / Swift 6.1) fails during the
 ExpoModulesJSI XCFramework build.
+
+`mobile/app.json` keeps a stable `expo.version` major.minor base (e.g.
+`3.0.0`). CI rewrites the published marketing version to
+`major.minor.<build>` before `expo prebuild` so the IPA’s
+`CFBundleShortVersionString` matches the AltStore source `version` field.
+
+Release tags look like `<flavor>-v<semver>-build<build>`, e.g.
+`development-v3.0.10-build10` (patch equals the CI build).
+
+## SideStore update detection (important)
+
+SideStore decides **Update** vs **Open** by comparing **SemanticVersion of
+`version` / `CFBundleShortVersionString` only**. A bump to `buildVersion` /
+`CFBundleVersion` alone does **not** show Update when major.minor.patch are
+unchanged (upstream `InstalledApp.hasUpdate`; the older AltStore check that
+also compared `buildVersion` is commented out).
+
+Symptoms when only `buildVersion` changes: the new release appears in the
+source changelog, the button stays **Open**, and new JS/native bits only
+land after uninstall + reinstall.
+
+Mitigation (same approach as [tojemoc/vmp](https://github.com/tojemoc/vmp)
+PR #691 / [tojemoc/floaty](https://github.com/tojemoc/floaty)): every CI IPA
+must ship a **strictly increasing** marketing version. Helper:
+`scripts/ios-sidestore-marketing-version.mjs`. The publish job refuses a
+release whose marketing version is not strictly greater than every
+already-published release tag (so SideStore and Android stay ordered).
+
+The Android job writes the same marketing version to `expo.version`
+(`versionName`) and sets `expo.android.versionCode` from the CI build
+number before prebuild.
 
 ## Install on iPhone
 
