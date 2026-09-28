@@ -76,7 +76,7 @@ See [`mobile/README.md`](mobile/README.md) and [`docs/ios-sidestore-distribution
 ## Roadmap
 
 - [x] **Expo native client** — SideStore-ready scaffold with OCR / multi-source lookup / offline produce DB
-- [x] Wire GitHub Pages to serve `altstore-source.json` after mobile publishes
+- [x] Wire GitHub Pages to serve `altstore-source.json` + nightly.link IPA/APK install site after mobile publishes
 - [ ] Optional `@react-native-ml-kit/text-recognition` in the SideStore prebuild
 - [ ] Family / shared inventories
 - [ ] Passkey list/revoke on Worker; native passkey if/when practical

@@ -25,8 +25,9 @@ PWA + Expo native food / grocery tracker with passkey + magic-link auth and Clou
 - Keep Worker `/items` schema stable for all clients (`/cards` is a legacy alias)
 
 ### SideStore / GitHub Pages
-- AltStore source URL: `https://tojemoc.github.io/foodie/altstore-source.json`
-- Published by `mobile-artifacts.yml` (on `publish_release`) and `publish-sidestore-pages.yml`
+- Install site: `https://tojemoc.github.io/foodie/` (`altstore-source.json`, `downloads.json` with nightly.link IPA + APK)
+- Published by `mobile-artifacts.yml` (on `publish_release`, waits for Android when enabled) and `publish-sidestore-pages.yml`
+- Artifact names: `mobile-ios-ipa`, `mobile-android-apk`
 - Do not re-run GitHub’s dynamic `pages-build-deployment` — it wipes the Actions site
 
 Prefer reading `README.md` and `mobile/README.md`.

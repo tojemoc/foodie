@@ -1,18 +1,26 @@
 # Publish SideStore Pages
-# Rebuilds https://tojemoc.github.io/foodie/ (altstore-source.json + index)
-# via actions/deploy-pages from existing GitHub Releases — no IPA rebuild.
+# Rebuilds https://tojemoc.github.io/foodie/ (altstore-source.json, install
+# page, downloads.json with nightly.link IPA + APK URLs) via actions/deploy-pages.
 #
-# Use this when the AltStore source URL 404s or is stale — especially after
-# someone re-ran GitHub's dynamic "pages-build-deployment" workflow (no workflow
-# file; it deploys raw /docs markdown and wipes the Actions-published site).
+# Use this when the install site is missing or stale — especially after someone
+# re-ran GitHub's dynamic "pages-build-deployment" workflow (no workflow file;
+# it deploys raw /docs markdown and wipes the Actions-published site).
+#
+# Do NOT re-run Actions → pages-build-deployment to refresh nightly links.
 
 name: Publish SideStore Pages
 
 on:
   workflow_dispatch:
+    inputs:
+      mobile_artifacts_run_id:
+        description: Mobile artifacts run ID for nightly.link URLs (empty = latest successful main run with mobile-ios-ipa)
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -50,10 +58,13 @@ jobs:
             --meta docs/altstore-source.meta.json \
             --output docs/altstore-source.json
 
-      - name: Assemble SideStore Pages site
+      - name: Build Pages site (install page + nightly.link downloads.json)
         env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          MOBILE_ARTIFACTS_RUN_ID: ${{ inputs.mobile_artifacts_run_id }}
         run: python3 scripts/build-sidestore-pages-site.py
 
       - name: Configure GitHub Pages

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Install Foodie</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f1a14;
+        --card: #16241c;
+        --text: #e8f5ee;
+        --muted: #93b3a3;
+        --accent: #3ddc97;
+        --accent-text: #0a1610;
+        --secondary: rgba(255, 255, 255, 0.08);
+        --secondary-hover: rgba(255, 255, 255, 0.12);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: radial-gradient(1200px 600px at 20% -10%, #1d3b2c 0%, var(--bg) 55%);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      main {
+        width: 100%;
+        max-width: 420px;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.85rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--accent);
+      }
+      .version {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin: 0 0 1.5rem;
+      }
+      .notes {
+        margin-top: 1rem;
+        padding: 1rem 1.1rem;
+        border-radius: 12px;
+        background: var(--card);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .notes:first-of-type {
+        margin-top: 0;
+      }
+      .notes strong {
+        color: var(--text);
+      }
+      .notes ul {
+        margin: 0.5rem 0 0;
+        padding-left: 1.2rem;
+      }
+      .notes li {
+        margin-bottom: 0.35rem;
+      }
+      .source-url {
+        display: block;
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.65rem;
+        font-size: 0.75rem;
+        word-break: break-all;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 8px;
+        color: var(--muted);
+      }
+      .secondary-btn {
+        display: block;
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.85rem 1.1rem;
+        border-radius: 12px;
+        background: var(--secondary);
+        color: var(--text);
+        font-size: 0.95rem;
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+      }
+      .secondary-btn:hover,
+      .secondary-btn:focus {
+        background: var(--secondary-hover);
+      }
+      .primary-btn {
+        display: block;
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.95rem 1.1rem;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--accent-text);
+        font-size: 1rem;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+      }
+      .meta {
+        margin-top: 1rem;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+      .meta a {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Foodie</h1>
+      <p class="version">Version __VERSION__ · __FLAVOR_LABEL__</p>
+      <div class="notes">
+        <strong>iOS — SideStore / AltStore</strong>
+        <ul>
+          <li>Add this source URL in SideStore (includes GitHub pre-releases):</li>
+        </ul>
+        <code class="source-url">__ALTSTORE_SOURCE_URL__</code>
+        <p style="margin-top: 1rem">
+          SideStore re-signs the IPA from GitHub Releases with your Apple ID.
+        </p>
+      </div>
+      <div class="notes">
+        <strong>Direct CI artifacts (no GitHub login)</strong>
+        <ul>
+          <li>
+            Downloads via
+            <a href="https://nightly.link/" style="color: var(--text)">nightly.link</a>
+            using this run’s artifact IDs. nightly.link’s “latest by branch” shortcut only
+            sees <code>push</code>/<code>schedule</code> runs — not <code>workflow_dispatch</code> —
+            so this page publishes run-scoped URLs after each Mobile artifacts publish.
+          </li>
+          <li>Unzip the artifact, then install the <code>.ipa</code> / <code>.apk</code>.</li>
+          <li>GitHub Actions artifacts expire (typically after 90 days on public repos).</li>
+        </ul>
+        __ANDROID_NIGHTLY_BTN__
+        <a class="secondary-btn" href="__IOS_NIGHTLY_LINK__">Download iOS IPA via nightly.link (zip)</a>
+        <p class="meta">
+          Run <a href="__RUN_URL__">#__RUN_ID__</a>
+          · machine-readable
+          <a href="downloads.json">downloads.json</a>
+        </p>
+      </div>
+      <a class="secondary-btn" href="__ALTSTORE_SOURCE_URL__">Open AltStore source JSON</a>
+    </main>
+  </body>
+</html>

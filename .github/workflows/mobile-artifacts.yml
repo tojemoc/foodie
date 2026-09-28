@@ -284,8 +284,23 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: ${{ inputs.publish_release }}
-    needs: [build-ios]
+    # Wait for Android when it ran so Pages can publish nightly.link APK URLs.
+    # Android failure/skip must not block the iOS Release + AltStore Pages publish.
+    if: >-
+      ${{
+        !cancelled()
+        && inputs.publish_release
+        && needs.build-ios.result == 'success'
+        && (
+          needs.build-android.result == 'success'
+          || needs.build-android.result == 'skipped'
+          || needs.build-android.result == 'failure'
+          || needs.build-android.result == 'cancelled'
+        )
+      }}
+    needs:
+      - build-ios
+      - build-android
     runs-on: ubuntu-latest
     # Serialize AltStore feed generation → Pages deploy with the manual
     # publish-sidestore-pages workflow. Workflow-level concurrency above still
@@ -295,6 +310,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      actions: read
       pages: write
       id-token: write
     environment:
@@ -309,7 +325,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: mobile-ios-ipa
-          path: ./artifacts
+          path: ./artifacts/ios
+
+      - name: Download Android APK
+        if: ${{ needs.build-android.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-android-apk
+          path: ./artifacts/android
 
       - name: Stage release files
         id: stage
@@ -317,10 +340,11 @@ jobs:
           INPUT_BUILD: ${{ inputs.build_number }}
           INPUT_FLAVOR: ${{ inputs.flavor }}
           RUN_NUMBER: ${{ github.run_number }}
+          ANDROID_JOB_RESULT: ${{ needs.build-android.result }}
         run: |
           set -euo pipefail
-          mkdir -p release/ios
-          find ./artifacts -name '*.ipa' -exec cp {} release/ios/ \;
+          mkdir -p release/ios release/android
+          find ./artifacts/ios -name '*.ipa' -exec cp {} release/ios/ \;
           VERSION="$(node -p "require('./mobile/app.json').expo.version")"
           BUILD="${INPUT_BUILD:-$RUN_NUMBER}"
           FLAVOR="${INPUT_FLAVOR}"
@@ -331,10 +355,21 @@ jobs:
               exit 1
               ;;
           esac
+          has_apk=false
+          if [ "$ANDROID_JOB_RESULT" = "success" ]; then
+            apk="$(find ./artifacts/android -name '*.apk' | head -1 || true)"
+            if [ -n "$apk" ]; then
+              cp "$apk" "release/android/foodie-${VERSION}-android.apk"
+              has_apk=true
+            else
+              echo "::warning::Android job succeeded but no .apk was found in the artifact."
+            fi
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
           echo "tag=${FLAVOR}-v${VERSION}-build${BUILD}" >> "$GITHUB_OUTPUT"
-          ls -la release/ios/
+          echo "has_apk=${has_apk}" >> "$GITHUB_OUTPUT"
+          ls -la release/ios/ release/android/ || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -342,17 +377,23 @@ jobs:
           tag_name: ${{ steps.stage.outputs.tag }}
           name: ${{ inputs.flavor }} v${{ steps.stage.outputs.version }} (build ${{ steps.stage.outputs.build }})
           body: |
-            ## Foodie ${{ inputs.flavor }} iOS build
+            ## Foodie ${{ inputs.flavor }} mobile build
 
             - Version: `${{ steps.stage.outputs.version }}`
             - Build: `${{ steps.stage.outputs.build }}`
             - API: `${{ inputs.api_url }}`
             - Commit: `${{ github.sha }}`
 
+            Install page (SideStore source + IPA/APK downloads):  
+            `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/`
+
             **SideStore / AltStore:** add source  
             `https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/altstore-source.json`
           prerelease: ${{ inputs.flavor != 'release' }}
-          files: release/ios/*
+          fail_on_unmatched_files: false
+          files: |
+            release/ios/*
+            release/android/*
 
       - name: Generate AltStore source
         env:
@@ -372,10 +413,19 @@ jobs:
       # Do not re-run GitHub's dynamic pages-build-deployment — it deploys raw
       # /docs markdown and wipes this Actions-published site. Use Actions →
       # Publish SideStore Pages to restore or refresh without a full IPA build.
+      # nightly.link "latest by branch" only queries push/schedule; workflow_dispatch
+      # needs a run-scoped URL. Publish that evergreen pointer on Pages.
       - name: Assemble SideStore Pages site
         env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          MOBILE_ARTIFACTS_RUN_ID: ${{ github.run_id }}
+          VERSION_NAME: ${{ steps.stage.outputs.version }}
+          BUILD_NUMBER: ${{ steps.stage.outputs.build }}
+          FLAVOR_LABEL: ${{ inputs.flavor }}
+          ANDROID_JOB_RESULT: ${{ needs.build-android.result }}
         run: python3 scripts/build-sidestore-pages-site.py
 
       - name: Configure GitHub Pages
