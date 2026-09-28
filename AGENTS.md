@@ -29,6 +29,7 @@ PWA + Expo native food / grocery tracker with passkey + magic-link auth and Clou
 - Published by `mobile-artifacts.yml` (on `publish_release`, waits for Android when enabled) and `publish-sidestore-pages.yml`
 - Artifact names: `mobile-ios-ipa`, `mobile-android-apk`
 - Do not re-run GitHub’s dynamic `pages-build-deployment` — it wipes the Actions site
+- **SideStore caveat:** CI must bump `CFBundleShortVersionString` every release (`scripts/ios-sidestore-marketing-version.mjs` → `major.minor.<build>`); build-number-only bumps do not show Update in SideStore
 
 Prefer reading `README.md` and `mobile/README.md`.
 

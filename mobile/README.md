@@ -43,6 +43,11 @@ npm test
    `https://<owner>.github.io/foodie/altstore-source.json`
 4. Android — open `https://<owner>.github.io/foodie/` and use **Download Android APK** (GitHub Release asset), or the nightly.link zip / `mobile-android-apk` workflow artifact.
 
+CI encodes the Actions build number into the IPA marketing version
+(`3.0.0` + build `10` → `3.0.10`) so SideStore’s **Update** button appears.
+Build-number-only bumps stay **Open** — see
+`docs/ios-sidestore-distribution-playbook.md`.
+
 Republish the site without rebuilding via **Actions → Publish SideStore Pages**.
 
 Unsigned IPAs are re-signed by SideStore with your personal Apple ID.
