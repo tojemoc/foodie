@@ -38,10 +38,12 @@ npm test
 ## SideStore
 
 1. Run **Actions → Mobile artifacts → Run workflow** from `main` (or a feature branch with `publish_release=false`).
-2. Download the IPA artifact, or enable publish to create a GitHub Release + `docs/altstore-source.json`.
-3. In SideStore: **Sources → +** and add  
-   `https://<owner>.github.io/foodie/altstore-source.json`  
-   (after Pages is wired to serve that file).
+2. Download IPA/APK artifacts, or enable publish to create a GitHub Release and deploy the install site to GitHub Pages.
+3. iOS — in SideStore: **Sources → +** and add  
+   `https://<owner>.github.io/foodie/altstore-source.json`
+4. Android — open `https://<owner>.github.io/foodie/` and use **Download Android APK** (GitHub Release asset), or the nightly.link zip / `mobile-android-apk` workflow artifact.
+
+Republish the site without rebuilding via **Actions → Publish SideStore Pages**.
 
 Unsigned IPAs are re-signed by SideStore with your personal Apple ID.
 

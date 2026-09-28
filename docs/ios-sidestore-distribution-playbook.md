@@ -32,6 +32,39 @@ ExpoModulesJSI XCFramework build.
 You can also sideload a downloaded IPA artifact directly in SideStore
 without adding a source.
 
+## GitHub Pages install site
+
+Before the first deploy, set **Settings → Pages → Build and deployment →
+Source** to **GitHub Actions**. `actions/configure-pages` does not enable
+Pages by itself. Switching Source back to a branch later can replace the
+Actions-published site with whatever that branch serves (often a 404 or
+raw `/docs` content).
+
+Each **Mobile artifacts** run with `publish_release=true` regenerates
+`altstore-source.json` from GitHub Releases and deploys the install site to
+GitHub Pages (Actions deploy — no git push to a `gh-pages` branch):
+
+- `https://<owner>.github.io/foodie/` — install page
+- `…/altstore-source.json` — SideStore / AltStore source
+- `…/downloads.json` — machine-readable IPA/APK pointers (Release + nightly.link)
+
+Publish waits for the Android job when it ran so the APK is attached to the
+GitHub Release (`foodie-<version>-android.apk`) and linked from the install
+page. If Android fails or is skipped, iOS Release + Pages still publish
+(without an APK button).
+
+nightly.link’s “latest by branch” shortcut only sees `push` / `schedule`
+runs, not `workflow_dispatch`, so the site also publishes **run-scoped**
+nightly.link URLs after each publish. If nightly.link returns “Repository
+not found” for a public repo, install the
+[nightly.link GitHub App](https://github.com/apps/nightly-link) on the
+repository (the Release APK link still works without it).
+
+To refresh without rebuilding (for example after a mistaken re-run of
+GitHub’s dynamic `pages-build-deployment` wiped the site), run
+**Actions → Publish SideStore Pages** from `main`. Optionally pass a
+`mobile_artifacts_run_id` to pin the nightly.link artifacts.
+
 ## Refresh
 
 Free Apple IDs expire apps about every 7 days. Open SideStore on the same
