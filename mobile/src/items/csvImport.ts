@@ -66,11 +66,16 @@ export function splitCsvRecords(text: string): string[] {
       continue;
     }
     if (ch === '\n') {
-      records.push(cur.replace(/\r$/, ''));
+      records.push(cur);
       cur = '';
       continue;
     }
-    if (ch === '\r') continue;
+    if (ch === '\r') {
+      records.push(cur);
+      cur = '';
+      if (src[i + 1] === '\n') i++;
+      continue;
+    }
     cur += ch;
   }
   if (cur.length) records.push(cur);
@@ -131,9 +136,12 @@ export function parseInventoryCsv(text: string): CsvImportResult {
     let expiryDate: string | undefined = parseFlexibleDate(dateCell) ?? undefined;
     if (!expiryDate && dateCell) {
       noteParts.push(dateCell);
-      const embedded = dateCell.match(/(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2,4})/);
-      if (embedded) {
-        expiryDate = parseFlexibleDate(`${embedded[1]}.${embedded[2]}.${embedded[3]}`) ?? undefined;
+      // Invalid ISO dates must not be re-parsed via the day-first embedded fallback.
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateCell)) {
+        const embedded = dateCell.match(/(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2,4})/);
+        if (embedded) {
+          expiryDate = parseFlexibleDate(`${embedded[1]}.${embedded[2]}.${embedded[3]}`) ?? undefined;
+        }
       }
     }
 

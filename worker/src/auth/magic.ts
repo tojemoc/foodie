@@ -56,15 +56,27 @@ function clientIp(request: Request): string {
   );
 }
 
+/** Prefix for per-attempt KV slots (and legacy single counter key). */
+function codeAttemptPrefix(ip: string, email: string): string {
+  return `magicfail:${ip}:${email}`;
+}
+
+/**
+ * Count failed-attempt slots under a shared prefix. Each failure writes its own
+ * key so concurrent requests cannot under-count via read-modify-write races.
+ */
+async function countCodeAttempts(env: Env, ip: string, email: string): Promise<number> {
+  const listed = await env.FOODIE_KV.list({ prefix: codeAttemptPrefix(ip, email) });
+  return listed.keys.length;
+}
+
 async function checkCodeAttemptLimit(
   env: Env,
   ip: string,
   email: string,
 ): Promise<{ ok: true } | { ok: false; response: Response }> {
-  const key = `magicfail:${ip}:${email}`;
-  const raw = await env.FOODIE_KV.get(key);
-  const count = raw ? Number(raw) : 0;
-  if (Number.isFinite(count) && count >= CODE_ATTEMPT_LIMIT) {
+  const count = await countCodeAttempts(env, ip, email);
+  if (count >= CODE_ATTEMPT_LIMIT) {
     return {
       ok: false,
       response: jsonResponse({ error: 'Too many passcode attempts. Try again later.' }, 429, env),
@@ -74,10 +86,8 @@ async function checkCodeAttemptLimit(
 }
 
 async function recordCodeAttempt(env: Env, ip: string, email: string): Promise<void> {
-  const key = `magicfail:${ip}:${email}`;
-  const raw = await env.FOODIE_KV.get(key);
-  const next = (raw ? Number(raw) : 0) + 1;
-  await env.FOODIE_KV.put(key, String(Number.isFinite(next) ? next : 1), {
+  const slot = crypto.randomUUID();
+  await env.FOODIE_KV.put(`${codeAttemptPrefix(ip, email)}:${slot}`, '1', {
     expirationTtl: CODE_ATTEMPT_TTL_SEC,
   });
 }

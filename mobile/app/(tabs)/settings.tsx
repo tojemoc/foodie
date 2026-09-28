@@ -55,15 +55,18 @@ export default function SettingsScreen() {
   async function onEnablePush() {
     setBusy(true);
     setStatus('');
-    const res = await registerDailyExpiryDigest();
-    setBusy(false);
-    if (!res.ok) {
-      setStatus(res.error ?? 'Could not enable notifications');
-      return;
+    try {
+      const res = await registerDailyExpiryDigest();
+      if (!res.ok) {
+        setStatus(res.error ?? 'Could not enable notifications');
+        return;
+      }
+      await notifyExpiringSoonNow();
+      setPushOn(true);
+      setStatus('Daily expiry notification set for 8:00 (local).');
+    } finally {
+      setBusy(false);
     }
-    await notifyExpiringSoonNow();
-    setPushOn(true);
-    setStatus('Daily expiry notification set for 8:00 (local).');
   }
 
   async function onDisablePush() {

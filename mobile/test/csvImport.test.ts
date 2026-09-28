@@ -79,6 +79,25 @@ describe('parseInventoryCsv', () => {
     assert.equal(rows[0]!.expiryDate, '2028-02-01');
   });
 
+  it('treats bare CR as a record boundary and keeps CR inside quotes', () => {
+    const csv = 'jedlo,koľko,miesto,dátum\r"a\rb",,pantry,1.2.2028\rc,\r\n';
+    const records = splitCsvRecords(csv);
+    assert.equal(records.length, 3);
+    assert.equal(records[1], '"a\rb",,pantry,1.2.2028');
+    const { rows } = parseInventoryCsv(csv);
+    assert.equal(rows[0]!.name, 'a\rb');
+  });
+
+  it('keeps invalid ISO dates in notes without day-first salvage', () => {
+    const csv = 'jedlo,koľko,miesto,dátum\nbadiso,,,2027-02-30\nnoteonly,,,otvorený 20.9.2026\n';
+    const { rows } = parseInventoryCsv(csv);
+    const bad = rows.find(r => r.name === 'badiso');
+    assert.equal(bad?.expiryDate, undefined);
+    assert.match(bad?.notes ?? '', /2027-02-30/);
+    const note = rows.find(r => r.name === 'noteonly');
+    assert.equal(note?.expiryDate, '2026-09-20');
+  });
+
   it('imports the repository inventúra fixture', () => {
     const text = readFileSync(fixturePath, 'utf8');
     const { rows } = parseInventoryCsv(text);

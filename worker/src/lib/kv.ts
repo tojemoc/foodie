@@ -92,6 +92,21 @@ export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void>
   ]);
 }
 
+/**
+ * Best-effort single-use claim via per-request KV slots.
+ * Concurrent verifiers each write a claim key; only the lexicographically first
+ * winner may consume the credential (Workers KV has no true CAS).
+ */
+async function claimMagicCredential(env: Env, primaryKey: string): Promise<boolean> {
+  const claimId = crypto.randomUUID();
+  const prefix = `magicclaim:${primaryKey}:`;
+  const claimKey = `${prefix}${claimId}`;
+  await env.FOODIE_KV.put(claimKey, '1', { expirationTtl: MAGIC_TTL_SEC });
+  const listed = await env.FOODIE_KV.list({ prefix });
+  const names = listed.keys.map(k => k.name).sort();
+  return names[0] === claimKey;
+}
+
 /** Consume by long token, or by email-scoped 6-digit passcode. */
 export async function getAndDeleteMagicLink(
   env: Env,
@@ -110,6 +125,10 @@ export async function getAndDeleteMagicLink(
   } else {
     primaryKey = `magiclink:${raw}`;
   }
+
+  // Claim before read so concurrent requests cannot both verify the same credential.
+  const won = await claimMagicCredential(env, primaryKey);
+  if (!won) return null;
 
   const data = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
   if (!data) return null;
@@ -269,7 +288,7 @@ export interface StoredPushSubscription {
   createdAt: string;
 }
 
-async function endpointKeyHash(endpoint: string): Promise<string> {
+export async function endpointKeyHash(endpoint: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
   return [...new Uint8Array(digest)]
     .map(b => b.toString(16).padStart(2, '0'))

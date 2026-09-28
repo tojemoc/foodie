@@ -20,8 +20,13 @@ export interface UserPrefs {
 export interface DigestDeliveryStamp {
   /** Local YYYY-MM-DD of last successful email digest. */
   email?: string;
-  /** Local YYYY-MM-DD of last successful push digest. */
+  /**
+   * Legacy whole-channel push stamp (pre per-subscription tracking).
+   * Treated as “all current subs delivered for that local date”.
+   */
   push?: string;
+  /** endpoint hash → local YYYY-MM-DD of last successful push to that subscription. */
+  pushByEndpoint?: Record<string, string>;
   /** Local YYYY-MM-DD when inventory had nothing expiring (skip re-scan). */
   empty?: string;
 }

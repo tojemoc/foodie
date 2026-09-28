@@ -28,7 +28,11 @@ export default function AuthScreen() {
       setError(res.error ?? 'Could not send magic link');
       return;
     }
-    await AsyncStorage.setItem(LAST_EMAIL_KEY, normalized);
+    try {
+      await AsyncStorage.setItem(LAST_EMAIL_KEY, normalized);
+    } catch {
+      // Still show send confirmation — email was already delivered.
+    }
     setSent(true);
     if (res.code) setDevCode(res.code);
   }

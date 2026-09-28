@@ -6,7 +6,9 @@ import {
   getUserPrefs,
   getDigestStamp,
   putDigestStamp,
+  endpointKeyHash,
   DEFAULT_DIGEST_TIMEZONE,
+  type StoredPushSubscription,
 } from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
 import { sendPushNotification, PushSendError } from '../lib/webpush.js';
@@ -28,10 +30,10 @@ interface LocalClock {
 }
 
 /**
- * Hourly cron: for each user whose local clock is ~08:00, email + Web Push a
+ * Hourly cron: for each user whose local clock is at/after 08:00, email + Web Push a
  * list of items expiring within the next week (opt-in email via prefs).
- * Each channel is stamped only after a successful send so failed Brevo/push
- * attempts remain eligible for retry within the same local morning.
+ * Each channel / subscription is stamped only after a successful send so failed
+ * Brevo/push attempts remain eligible for retry later the same local day.
  */
 export async function runExpiryDigest(env: Env): Promise<void> {
   const canEmail = !!env.BREVO_API_KEY;
@@ -61,16 +63,20 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       const prefs = await getUserPrefs(env, userId);
       const clock = localClock(now, prefs.timezone || DEFAULT_DIGEST_TIMEZONE);
 
-      if (clock.hour !== DIGEST_LOCAL_HOUR) {
+      // Before 08:00 local — wait. At/after 08:00, allow retries when stamps are unset.
+      if (clock.hour < DIGEST_LOCAL_HOUR) {
         skippedHour++;
         continue;
       }
 
       const stamp = await getDigestStamp(env, userId);
       const wantEmail = canEmail && prefs.emailDigest && stamp.email !== clock.date;
-      const wantPushCheck = canPush && stamp.push !== clock.date;
+      const subs = canPush ? await getPushSubscriptions(env, userId) : [];
+      const pendingPush = canPush
+        ? await pendingPushSubs(subs, stamp, clock.date)
+        : [];
 
-      if (!wantEmail && !wantPushCheck && stamp.empty === clock.date) continue;
+      if (!wantEmail && !pendingPush.length && stamp.empty === clock.date) continue;
 
       const items = (await kvGetItems(env, userId)) ?? [];
       const expiring = filterExpiringSoon(items, clock.date);
@@ -82,7 +88,10 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       }
 
       processed++;
-      const nextStamp: DigestDeliveryStamp = { ...stamp };
+      const nextStamp: DigestDeliveryStamp = {
+        ...stamp,
+        pushByEndpoint: { ...(stamp.pushByEndpoint ?? {}) },
+      };
 
       if (wantEmail) {
         const html = buildDigestHtml(expiring, env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev');
@@ -102,16 +111,21 @@ export async function runExpiryDigest(env: Env): Promise<void> {
         }
       }
 
-      if (wantPushCheck) {
-        const n = await sendExpiryPush(env, userId, expiring);
-        pushesSent += n;
-        if (n > 0) nextStamp.push = clock.date;
+      if (pendingPush.length) {
+        const delivered = await sendExpiryPush(env, userId, expiring, pendingPush);
+        pushesSent += delivered.length;
+        for (const hash of delivered) {
+          nextStamp.pushByEndpoint![hash] = clock.date;
+        }
+        // Drop legacy whole-channel stamp once we track per subscription.
+        if (nextStamp.push === clock.date) delete nextStamp.push;
       }
 
       if (
         nextStamp.email !== stamp.email ||
         nextStamp.push !== stamp.push ||
-        nextStamp.empty !== stamp.empty
+        nextStamp.empty !== stamp.empty ||
+        JSON.stringify(nextStamp.pushByEndpoint ?? {}) !== JSON.stringify(stamp.pushByEndpoint ?? {})
       ) {
         await putDigestStamp(env, userId, nextStamp);
       }
@@ -122,6 +136,23 @@ export async function runExpiryDigest(env: Env): Promise<void> {
   console.log(
     `expiry-digest: done — delivered users ${processed}, emails ${emailsSent}, pushes ${pushesSent}, wrong-hour ${skippedHour}`,
   );
+}
+
+async function pendingPushSubs(
+  subs: StoredPushSubscription[],
+  stamp: DigestDeliveryStamp,
+  localDate: string,
+): Promise<StoredPushSubscription[]> {
+  if (!subs.length) return [];
+  // Legacy whole-channel success: treat every current sub as already delivered today.
+  if (stamp.push === localDate) return [];
+  const byEndpoint = stamp.pushByEndpoint ?? {};
+  const pending: StoredPushSubscription[] = [];
+  for (const sub of subs) {
+    const hash = await endpointKeyHash(sub.endpoint);
+    if (byEndpoint[hash] !== localDate) pending.push(sub);
+  }
+  return pending;
 }
 
 export function localClock(now: Date, timeZone: string): LocalClock {
@@ -151,9 +182,14 @@ export function localClock(now: Date, timeZone: string): LocalClock {
   }
 }
 
-async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Promise<number> {
-  const subs = await getPushSubscriptions(env, userId);
-  if (!subs.length) return 0;
+/** Returns endpoint hashes that received the push successfully. */
+async function sendExpiryPush(
+  env: Env,
+  userId: string,
+  rows: ExpiringRow[],
+  subs: StoredPushSubscription[],
+): Promise<string[]> {
+  if (!subs.length) return [];
 
   const first = rows[0]!;
   const more = rows.length > 1 ? ` (+${rows.length - 1} more)` : '';
@@ -164,9 +200,10 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
     tag:   'foodie-expiry',
   };
 
-  let sent = 0;
+  const delivered: string[] = [];
 
   for (const sub of subs) {
+    const hash = await endpointKeyHash(sub.endpoint);
     try {
       await sendPushNotification(
         { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
@@ -177,7 +214,7 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
           EMAIL_FROM:        env.EMAIL_FROM,
         },
       );
-      sent++;
+      delivered.push(hash);
     } catch (err) {
       if (err instanceof PushSendError && err.code === 'subscription_gone') {
         console.log('expiry-digest: pruning stale push sub for', userId);
@@ -188,7 +225,7 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
     }
   }
 
-  return sent;
+  return delivered;
 }
 
 /** Exported for unit tests. `todayIso` is local YYYY-MM-DD. */

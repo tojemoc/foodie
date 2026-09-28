@@ -597,6 +597,8 @@ async function importCsvText(text: string): Promise<void> {
       notes: row.notes,
       expiryDate: row.expiryDate,
       placement: row.placement,
+      quantity: row.quantity,
+      unit: row.unit,
       color: meta.color,
       emoji: meta.emoji,
     }));

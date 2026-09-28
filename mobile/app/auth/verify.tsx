@@ -51,16 +51,25 @@ export default function VerifyScreen() {
     verifyingRef.current = true;
     setLoading(true);
     setError('');
-    if (credential !== value.trim()) setToken(credential);
-    if (email.trim()) await AsyncStorage.setItem(LAST_EMAIL_KEY, email.trim().toLowerCase());
-    const res = await verifyMagicToken(credential, needsEmail ? email.trim() : undefined);
-    verifyingRef.current = false;
-    setLoading(false);
-    if (!res.ok) {
-      setError(res.error ?? 'Verification failed');
-      return;
+    try {
+      if (credential !== value.trim()) setToken(credential);
+      if (email.trim()) {
+        try {
+          await AsyncStorage.setItem(LAST_EMAIL_KEY, email.trim().toLowerCase());
+        } catch {
+          // Continue verification even if email cache write fails.
+        }
+      }
+      const res = await verifyMagicToken(credential, needsEmail ? email.trim() : undefined);
+      if (!res.ok) {
+        setError(res.error ?? 'Verification failed');
+        return;
+      }
+      router.replace('/');
+    } finally {
+      verifyingRef.current = false;
+      setLoading(false);
     }
-    router.replace('/');
   }
 
   useEffect(() => {

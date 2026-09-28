@@ -9,6 +9,8 @@ export interface Item {
   brand?:       string;
   expiryDate?:  string; // YYYY-MM-DD
   placement?:   string;
+  quantity?: number;
+  unit?: string;
   color:     string;
   emoji:     string;
   createdAt: string;

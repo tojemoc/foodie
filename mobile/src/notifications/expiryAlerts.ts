@@ -5,6 +5,8 @@ import { getItems } from '../items/store';
 import { daysUntilExpiry } from '../items/types';
 
 const DAILY_DIGEST_ID = 'foodie-daily-expiry-digest';
+/** Schedule several mornings ahead so reminders keep firing between app opens. */
+const DIGEST_ROLLING_DAYS = 7;
 const DAILY_DIGEST_ENABLED_KEY = 'foodie_daily_digest_enabled_v1';
 
 Notifications.setNotificationHandler({
@@ -43,23 +45,42 @@ function nextLocalEightAm(from = new Date()): Date {
   return next;
 }
 
+function digestIdentifier(offset: number): string {
+  return offset === 0 ? DAILY_DIGEST_ID : `${DAILY_DIGEST_ID}-${offset}`;
+}
+
+async function cancelRollingDigests(): Promise<void> {
+  await Promise.all(
+    Array.from({ length: DIGEST_ROLLING_DAYS }, (_, i) =>
+      Notifications.cancelScheduledNotificationAsync(digestIdentifier(i)),
+    ),
+  );
+}
+
 async function scheduleNextDigest(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID);
+  await cancelRollingDigests();
 
   const body = buildDigestBody();
-  await Notifications.scheduleNotificationAsync({
-    identifier: DAILY_DIGEST_ID,
-    content: {
-      title: 'Foodie — expiring this week',
-      body: body || 'Open Foodie to review items expiring in the next 7 days.',
-      data: { type: 'expiry-digest' },
-      ...(Platform.OS === 'android' ? { channelId: 'expiry' } : {}),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: nextLocalEightAm(),
-    },
-  });
+  const content = {
+    title: 'Foodie — expiring this week',
+    body: body || 'Open Foodie to review items expiring in the next 7 days.',
+    data: { type: 'expiry-digest' },
+    ...(Platform.OS === 'android' ? { channelId: 'expiry' } : {}),
+  };
+
+  let at = nextLocalEightAm();
+  for (let i = 0; i < DIGEST_ROLLING_DAYS; i++) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: digestIdentifier(i),
+      content,
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: at,
+      },
+    });
+    at = new Date(at);
+    at.setDate(at.getDate() + 1);
+  }
 }
 
 /** Schedule / refresh the next 08:00 local digest with freshly calculated content. */
@@ -69,9 +90,17 @@ export async function registerDailyExpiryDigest(): Promise<{ ok: boolean; error?
     return { ok: false, error: 'Notification permission denied' };
   }
 
-  await AsyncStorage.setItem(DAILY_DIGEST_ENABLED_KEY, '1');
-  await scheduleNextDigest();
-  return { ok: true };
+  try {
+    // Schedule first so a failure does not leave reminders marked enabled.
+    await scheduleNextDigest();
+    await AsyncStorage.setItem(DAILY_DIGEST_ENABLED_KEY, '1');
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Could not schedule daily reminder',
+    };
+  }
 }
 
 /** Recompute body and reschedule the next 08:00 alert when inventory or the day changes. */
@@ -84,7 +113,7 @@ export async function refreshDailyExpiryDigest(): Promise<void> {
 }
 
 export async function unregisterDailyExpiryDigest(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID);
+  await cancelRollingDigests();
   await AsyncStorage.removeItem(DAILY_DIGEST_ENABLED_KEY);
 }
 
@@ -92,7 +121,7 @@ export async function isDailyExpiryDigestScheduled(): Promise<boolean> {
   const enabled = await AsyncStorage.getItem(DAILY_DIGEST_ENABLED_KEY);
   if (enabled === '1') return true;
   const all = await Notifications.getAllScheduledNotificationsAsync();
-  return all.some(n => n.identifier === DAILY_DIGEST_ID);
+  return all.some(n => n.identifier === DAILY_DIGEST_ID || n.identifier.startsWith(`${DAILY_DIGEST_ID}-`));
 }
 
 /** Immediate local notification for items expiring within 3 days (on open / after enable). */
