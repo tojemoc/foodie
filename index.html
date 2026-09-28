@@ -78,6 +78,21 @@
     </div>
   </div>
 
+  <!-- ═══ MAGIC HANDOFF (token not consumed until user confirms) ═══ -->
+  <div id="magic-handoff" class="magic-verifying" style="display:none">
+    <div class="auth-logo">Foodie<span>.</span></div>
+    <h2 style="margin:0;font-size:22px">Finish sign-in</h2>
+    <p id="magic-handoff-lead" style="color:var(--muted);max-width:360px;line-height:1.55;margin:0">
+      Open the Foodie app (SideStore), or continue in this browser. The link is only used once — do not open it in both.
+    </p>
+    <button class="passkey-btn" id="magic-open-app-btn" type="button">Open Foodie app</button>
+    <button class="magic-btn" id="magic-continue-web-btn" type="button">Continue in this browser</button>
+    <p style="color:var(--muted);font-size:13px;max-width:360px;line-height:1.5;margin:0">
+      Prefer typing? In the app choose <strong>Paste / open verify</strong> and enter the 6-digit passcode from the email.
+    </p>
+    <div class="auth-error" id="magic-handoff-error"></div>
+  </div>
+
   <!-- ═══ MAGIC VERIFYING ═══ -->
   <div id="magic-verifying" class="magic-verifying" style="display:none">
     <div class="spinner"></div>

@@ -55,7 +55,14 @@ async function request<T extends object>(
 }
 
 export const authMagicSend = (email: string) =>
-  request<{ ok: boolean }>('/auth/magic/send', 'POST', { email });
+  request<{
+    ok: boolean;
+    code?: string;
+    token?: string;
+    deepLink?: string;
+    webUrl?: string;
+    emailConfigured?: boolean;
+  }>('/auth/magic/send', 'POST', { email });
 
 export const authMagicVerify = (token: string) =>
   request<AuthResponse>('/auth/magic/verify', 'POST', { token });
