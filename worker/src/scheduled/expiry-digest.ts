@@ -1,10 +1,11 @@
-import type { Env, User, Item, UserPrefs } from '../types.js';
+import type { Env, User, Item, DigestDeliveryStamp } from '../types.js';
 import {
   getItems as kvGetItems,
   getPushSubscriptions,
   deletePushSubscription,
   getUserPrefs,
-  putUserPrefs,
+  getDigestStamp,
+  putDigestStamp,
   DEFAULT_DIGEST_TIMEZONE,
 } from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
@@ -29,6 +30,8 @@ interface LocalClock {
 /**
  * Hourly cron: for each user whose local clock is ~08:00, email + Web Push a
  * list of items expiring within the next week (opt-in email via prefs).
+ * Each channel is stamped only after a successful send so failed Brevo/push
+ * attempts remain eligible for retry within the same local morning.
  */
 export async function runExpiryDigest(env: Env): Promise<void> {
   const canEmail = !!env.BREVO_API_KEY;
@@ -58,24 +61,30 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       const prefs = await getUserPrefs(env, userId);
       const clock = localClock(now, prefs.timezone || DEFAULT_DIGEST_TIMEZONE);
 
-      // Only deliver around 8:00 local; mark the day so re-runs in the same hour don't spam.
       if (clock.hour !== DIGEST_LOCAL_HOUR) {
         skippedHour++;
         continue;
       }
-      if (prefs.lastDigestLocalDate === clock.date) continue;
+
+      const stamp = await getDigestStamp(env, userId);
+      const wantEmail = canEmail && prefs.emailDigest && stamp.email !== clock.date;
+      const wantPushCheck = canPush && stamp.push !== clock.date;
+
+      if (!wantEmail && !wantPushCheck && stamp.empty === clock.date) continue;
 
       const items = (await kvGetItems(env, userId)) ?? [];
       const expiring = filterExpiringSoon(items, clock.date);
       if (!expiring.length) {
-        // Still stamp the day so empty inventories don't get re-scanned every minute of hour 8.
-        await stampDigestDay(env, userId, prefs, clock.date);
+        if (stamp.empty !== clock.date) {
+          await putDigestStamp(env, userId, { ...stamp, empty: clock.date });
+        }
         continue;
       }
 
       processed++;
+      const nextStamp: DigestDeliveryStamp = { ...stamp };
 
-      if (canEmail && prefs.emailDigest) {
+      if (wantEmail) {
         const html = buildDigestHtml(expiring, env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev');
         const result = await sendBrevoEmail({
           apiKey:    env.BREVO_API_KEY!,
@@ -85,15 +94,27 @@ export async function runExpiryDigest(env: Env): Promise<void> {
           subject:   `Foodie — ${expiring.length} item(s) expiring in the next week`,
           html,
         });
-        if (result.ok) emailsSent++;
-        else console.error('expiry-digest: Brevo failed for', userId, result.body);
+        if (result.ok) {
+          emailsSent++;
+          nextStamp.email = clock.date;
+        } else {
+          console.error('expiry-digest: Brevo failed for', userId, result.body);
+        }
       }
 
-      if (canPush) {
-        pushesSent += await sendExpiryPush(env, userId, expiring);
+      if (wantPushCheck) {
+        const n = await sendExpiryPush(env, userId, expiring);
+        pushesSent += n;
+        if (n > 0) nextStamp.push = clock.date;
       }
 
-      await stampDigestDay(env, userId, prefs, clock.date);
+      if (
+        nextStamp.email !== stamp.email ||
+        nextStamp.push !== stamp.push ||
+        nextStamp.empty !== stamp.empty
+      ) {
+        await putDigestStamp(env, userId, nextStamp);
+      }
     }
     cursor = list.list_complete ? undefined : list.cursor;
   } while (cursor);
@@ -101,20 +122,6 @@ export async function runExpiryDigest(env: Env): Promise<void> {
   console.log(
     `expiry-digest: done — delivered users ${processed}, emails ${emailsSent}, pushes ${pushesSent}, wrong-hour ${skippedHour}`,
   );
-}
-
-async function stampDigestDay(
-  env: Env,
-  userId: string,
-  prefs: UserPrefs,
-  localDate: string,
-): Promise<void> {
-  if (prefs.lastDigestLocalDate === localDate) return;
-  await putUserPrefs(env, userId, {
-    ...prefs,
-    lastDigestLocalDate: localDate,
-    updatedAt: new Date().toISOString(),
-  });
 }
 
 export function localClock(now: Date, timeZone: string): LocalClock {
@@ -137,7 +144,6 @@ export function localClock(now: Date, timeZone: string): LocalClock {
       date: `${year}-${month}-${day}`,
     };
   } catch {
-    // Fall back to UTC
     return {
       hour: now.getUTCHours(),
       date: now.toISOString().slice(0, 10),

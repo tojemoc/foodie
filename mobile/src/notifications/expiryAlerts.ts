@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getItems } from '../items/store';
 import { daysUntilExpiry } from '../items/types';
 
 const DAILY_DIGEST_ID = 'foodie-daily-expiry-digest';
+const DAILY_DIGEST_ENABLED_KEY = 'foodie_daily_digest_enabled_v1';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,28 +16,35 @@ Notifications.setNotificationHandler({
   }),
 });
 
+async function ensureAndroidExpiryChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('expiry', {
+    name: 'Expiry reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+}
+
 export async function ensureNotificationPermissions(): Promise<boolean> {
+  // Android 13+ needs the channel before the runtime permission prompt.
+  await ensureAndroidExpiryChannel();
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   const asked = await Notifications.requestPermissionsAsync();
   return !!asked.granted;
 }
 
-/** Schedule a repeating local notification around 08:00 listing items expiring within 7 days. */
-export async function registerDailyExpiryDigest(): Promise<{ ok: boolean; error?: string }> {
-  const granted = await ensureNotificationPermissions();
-  if (!granted) {
-    return { ok: false, error: 'Notification permission denied' };
+function nextLocalEightAm(from = new Date()): Date {
+  const next = new Date(from);
+  next.setSeconds(0, 0);
+  next.setHours(8, 0, 0, 0);
+  if (next.getTime() <= from.getTime()) {
+    next.setDate(next.getDate() + 1);
   }
+  return next;
+}
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('expiry', {
-      name: 'Expiry reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
-  }
-
-  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID).catch(() => {});
+async function scheduleNextDigest(): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID);
 
   const body = buildDigestBody();
   await Notifications.scheduleNotificationAsync({
@@ -47,20 +56,41 @@ export async function registerDailyExpiryDigest(): Promise<{ ok: boolean; error?
       ...(Platform.OS === 'android' ? { channelId: 'expiry' } : {}),
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 8,
-      minute: 0,
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: nextLocalEightAm(),
     },
   });
+}
 
+/** Schedule / refresh the next 08:00 local digest with freshly calculated content. */
+export async function registerDailyExpiryDigest(): Promise<{ ok: boolean; error?: string }> {
+  const granted = await ensureNotificationPermissions();
+  if (!granted) {
+    return { ok: false, error: 'Notification permission denied' };
+  }
+
+  await AsyncStorage.setItem(DAILY_DIGEST_ENABLED_KEY, '1');
+  await scheduleNextDigest();
   return { ok: true };
 }
 
+/** Recompute body and reschedule the next 08:00 alert when inventory or the day changes. */
+export async function refreshDailyExpiryDigest(): Promise<void> {
+  const enabled = await AsyncStorage.getItem(DAILY_DIGEST_ENABLED_KEY);
+  if (enabled !== '1') return;
+  const granted = await ensureNotificationPermissions();
+  if (!granted) return;
+  await scheduleNextDigest();
+}
+
 export async function unregisterDailyExpiryDigest(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID).catch(() => {});
+  await Notifications.cancelScheduledNotificationAsync(DAILY_DIGEST_ID);
+  await AsyncStorage.removeItem(DAILY_DIGEST_ENABLED_KEY);
 }
 
 export async function isDailyExpiryDigestScheduled(): Promise<boolean> {
+  const enabled = await AsyncStorage.getItem(DAILY_DIGEST_ENABLED_KEY);
+  if (enabled === '1') return true;
   const all = await Notifications.getAllScheduledNotificationsAsync();
   return all.some(n => n.identifier === DAILY_DIGEST_ID);
 }

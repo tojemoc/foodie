@@ -29,6 +29,9 @@ EMAIL_FROM_NAME  = "Foodie Team"
 #   wrangler secret put VAPID_PUBLIC_KEY
 # Or add VAPID_PUBLIC_KEY under [vars] once generated.
 # Generate a pair locally with Web Crypto (see README).
+#
+# Local-only (never enable in prod): MAGIC_DEV_ECHO=1 in .dev.vars echoes
+# magic token/code when BREVO_API_KEY is unset.
 
 # ── Staging environment ────────────────────────────────────────
 # Deploy with: wrangler deploy --env staging

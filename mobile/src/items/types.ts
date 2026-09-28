@@ -46,25 +46,29 @@ export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
 export type ExpiryStatus = 'fresh' | 'expiring-soon' | 'expired' | 'unknown';
 
+function parseIsoLocalMidnight(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/** Whole-day offset from local calendar "today" to expiry (DST-safe). */
+export function daysUntilExpiry(expiryDate?: string, ref: Date = new Date()): number | null {
+  if (!expiryDate) return null;
+  const exp = parseIsoLocalMidnight(expiryDate);
+  if (!exp) return null;
+  const today = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const expDay = new Date(exp.getFullYear(), exp.getMonth(), exp.getDate());
+  return Math.round((expDay.getTime() - today.getTime()) / 86_400_000);
+}
+
 export function getExpiryStatus(expiryDate?: string, warnDays = 3): ExpiryStatus {
-  if (!expiryDate) return 'unknown';
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const expiry = new Date(`${expiryDate}T00:00:00`);
-  if (Number.isNaN(expiry.getTime())) return 'unknown';
-  const diffDays = Math.floor((expiry.getTime() - now.getTime()) / 86_400_000);
+  const diffDays = daysUntilExpiry(expiryDate);
+  if (diffDays === null) return 'unknown';
   if (diffDays < 0) return 'expired';
   if (diffDays <= warnDays) return 'expiring-soon';
   return 'fresh';
-}
-
-export function daysUntilExpiry(expiryDate?: string): number | null {
-  if (!expiryDate) return null;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const expiry = new Date(`${expiryDate}T00:00:00`);
-  if (Number.isNaN(expiry.getTime())) return null;
-  return Math.floor((expiry.getTime() - now.getTime()) / 86_400_000);
 }
 
 export const DEFAULT_PLACEMENTS = [

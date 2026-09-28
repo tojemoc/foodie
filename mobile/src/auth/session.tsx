@@ -21,7 +21,7 @@ interface AuthContextValue {
   sendMagicLink: (
     email: string,
   ) => Promise<{ ok: boolean; error?: string; code?: string; deepLink?: string }>;
-  verifyMagicToken: (token: string) => Promise<{ ok: boolean; error?: string }>;
+  verifyMagicToken: (token: string, email?: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
   continueOffline: () => void;
 }
@@ -119,8 +119,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const verifyMagicToken = useCallback(async (token: string) => {
-    const res = await authMagicVerify(token);
+  const verifyMagicToken = useCallback(async (token: string, email?: string) => {
+    const res = await authMagicVerify(token, email);
     if (res.error || !res.token || !res.userId) {
       return { ok: false, error: res.error ?? 'Invalid or expired link' };
     }

@@ -1,7 +1,7 @@
 import type { Item }                    from '../types.js';
 import { getItems, addItem, updateItem, removeItem, makeItem, touchItem } from '../items/store.js';
 import { pushToRemote }                from '../items/sync.js';
-import { parseInventoryCsv }           from '../items/csvImport.js';
+import { csvImportDedupeKey, parseInventoryCsv } from '../items/csvImport.js';
 import { showToast }                   from './toast.js';
 import { isScanCameraSupported, startScan } from '../scanner/scanner.js';
 import { lookupBarcode }               from '../services/openfood.js';
@@ -527,7 +527,11 @@ export async function importItems(e: Event): Promise<void> {
   const text = await file.text();
   const lower = file.name.toLowerCase();
   try {
-    if (lower.endsWith('.csv') || looksLikeCsv(text)) {
+    if (lower.endsWith('.csv')) {
+      await importCsvText(text);
+    } else if (looksLikeJsonArray(text)) {
+      await importJsonText(text);
+    } else if (looksLikeCsv(text)) {
       await importCsvText(text);
     } else {
       await importJsonText(text);
@@ -536,6 +540,11 @@ export async function importItems(e: Event): Promise<void> {
     showToast('Import failed: invalid file');
   }
   (e.target as HTMLInputElement).value = '';
+}
+
+function looksLikeJsonArray(text: string): boolean {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith('[') || trimmed.startsWith('{');
 }
 
 function looksLikeCsv(text: string): boolean {
@@ -562,8 +571,22 @@ async function importJsonText(text: string): Promise<void> {
 
 async function importCsvText(text: string): Promise<void> {
   const { rows, skipped } = parseInventoryCsv(text);
+  const existingKeys = new Set(
+    getItems().map(c => csvImportDedupeKey({
+      name: c.productName || c.name,
+      placement: c.placement,
+      expiryDate: c.expiryDate,
+    })),
+  );
   let added = 0;
+  let dupes = 0;
   for (const row of rows) {
+    const key = csvImportDedupeKey(row);
+    if (existingKeys.has(key)) {
+      dupes++;
+      continue;
+    }
+    existingKeys.add(key);
     const meta = PLACEMENT_META[row.placement || ''] ?? { emoji: '🥗', color: '#6B7280' };
     addItem(makeItem({
       name: row.name,
@@ -580,7 +603,10 @@ async function importCsvText(text: string): Promise<void> {
     added++;
   }
   renderItems();
-  showToast(`Imported ${added} from CSV${skipped ? ` (${skipped} skipped)` : ''}`);
+  const extra = [skipped && `${skipped} empty`, dupes && `${dupes} duplicate`]
+    .filter(Boolean)
+    .join(', ');
+  showToast(`Imported ${added} from CSV${extra ? ` (${extra})` : ''}`);
   await pushToRemote();
 }
 

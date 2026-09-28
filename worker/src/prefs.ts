@@ -42,7 +42,6 @@ export async function putPrefs(request: Request, env: Env): Promise<Response> {
   const next: UserPrefs = {
     emailDigest: typeof body.emailDigest === 'boolean' ? body.emailDigest : current.emailDigest,
     timezone: body.timezone !== undefined ? sanitizeTimezone(body.timezone) : current.timezone,
-    lastDigestLocalDate: current.lastDigestLocalDate,
     updatedAt: new Date().toISOString(),
   };
 

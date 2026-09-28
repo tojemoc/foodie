@@ -13,9 +13,17 @@ export interface UserPrefs {
   emailDigest: boolean;
   /** IANA timezone for 8:00 local delivery (default Europe/Bratislava). */
   timezone: string;
-  /** Local calendar date (YYYY-MM-DD) of the last digest send. */
-  lastDigestLocalDate?: string;
   updatedAt: string;
+}
+
+/** Per-channel digest delivery markers (`digeststamp:{userId}`) — not user-editable prefs. */
+export interface DigestDeliveryStamp {
+  /** Local YYYY-MM-DD of last successful email digest. */
+  email?: string;
+  /** Local YYYY-MM-DD of last successful push digest. */
+  push?: string;
+  /** Local YYYY-MM-DD when inventory had nothing expiring (skip re-scan). */
+  empty?: string;
 }
 
 export interface Credential {
@@ -75,6 +83,8 @@ export interface Env {
   FOODIE_KV:           KVNamespace;
   JWT_SECRET:          string;
   BREVO_API_KEY?:      string;
+  /** When "1"/"true", missing BREVO_API_KEY may echo magic token/code for local testing. */
+  MAGIC_DEV_ECHO?:     string;
   /** base64url uncompressed P-256 public key (safe to expose to clients). */
   VAPID_PUBLIC_KEY?:   string;
   /** base64url raw 32-byte P-256 private key (secret). */

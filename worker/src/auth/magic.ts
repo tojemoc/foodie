@@ -6,6 +6,8 @@ import { upsertUserByEmail, getUser, putMagicLink, getAndDeleteMagicLink } from 
 import { issueToken }            from './jwt.js';
 
 const MAGIC_TTL_MS = 15 * 60 * 1_000; // 15 minutes
+const CODE_ATTEMPT_LIMIT = 8;
+const CODE_ATTEMPT_TTL_SEC = 900;
 
 /** Pull a magic token out of a pasted URL / deep link / raw value. */
 export function normalizeMagicCredential(raw: string): string {
@@ -41,6 +43,45 @@ export function normalizeMagicCredential(raw: string): string {
   return trimmed;
 }
 
+function magicDevEchoEnabled(env: Env): boolean {
+  const v = env.MAGIC_DEV_ECHO?.trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+function clientIp(request: Request): string {
+  return (
+    request.headers.get('CF-Connecting-IP') ||
+    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
+}
+
+async function checkCodeAttemptLimit(
+  env: Env,
+  ip: string,
+  email: string,
+): Promise<{ ok: true } | { ok: false; response: Response }> {
+  const key = `magicfail:${ip}:${email}`;
+  const raw = await env.FOODIE_KV.get(key);
+  const count = raw ? Number(raw) : 0;
+  if (Number.isFinite(count) && count >= CODE_ATTEMPT_LIMIT) {
+    return {
+      ok: false,
+      response: jsonResponse({ error: 'Too many passcode attempts. Try again later.' }, 429, env),
+    };
+  }
+  return { ok: true };
+}
+
+async function recordCodeAttempt(env: Env, ip: string, email: string): Promise<void> {
+  const key = `magicfail:${ip}:${email}`;
+  const raw = await env.FOODIE_KV.get(key);
+  const next = (raw ? Number(raw) : 0) + 1;
+  await env.FOODIE_KV.put(key, String(Number.isFinite(next) ? next : 1), {
+    expirationTtl: CODE_ATTEMPT_TTL_SEC,
+  });
+}
+
 // ── Send ──────────────────────────────────────────────────────────────────────
 
 export async function magicSend(request: Request, env: Env): Promise<Response> {
@@ -60,15 +101,16 @@ export async function magicSend(request: Request, env: Env): Promise<Response> {
     code,
   });
 
-  // Browser PWA sends Origin (incl. staging preview URLs). Native clients
-  // usually omit it — fall back to FRONTEND_ORIGIN for the https handoff page.
-  const requestOrigin = request.headers.get('Origin');
-  const origin = (requestOrigin || env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev').replace(/\/$/, '');
+  // Trusted frontend origin only — never echo the request Origin into emailed links.
+  const origin = (env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev').replace(/\/$/, '');
   const webUrl   = `${origin}/?magic=${encodeURIComponent(token)}`;
   const deepLink = `foodie://auth/verify?token=${encodeURIComponent(token)}`;
 
   if (!env.BREVO_API_KEY) {
-    // Local / SideStore testing without email — return credentials once.
+    if (!magicDevEchoEnabled(env)) {
+      return jsonResponse({ error: 'Magic link email is not configured (BREVO_API_KEY).' }, 503, env);
+    }
+    // Local testing only when MAGIC_DEV_ECHO=1
     return jsonResponse({
       ok: true,
       code,
@@ -100,12 +142,29 @@ export async function magicSend(request: Request, env: Env): Promise<Response> {
 // ── Verify ────────────────────────────────────────────────────────────────────
 
 export async function magicVerify(request: Request, env: Env): Promise<Response> {
-  const body = await request.json<{ token?: string }>();
+  const body = await request.json<{ token?: string; email?: string }>();
   const credential = normalizeMagicCredential(body.token ?? '');
   if (!credential) return jsonResponse({ error: 'Missing token' }, 400, env);
 
-  const data = await getAndDeleteMagicLink(env, credential);
-  if (!data)                     return jsonResponse({ error: 'Link expired or already used' }, 401, env);
+  const isCode = /^\d{6}$/.test(credential);
+  const email = body.email?.toLowerCase().trim();
+  if (isCode) {
+    if (!email || !email.includes('@')) {
+      return jsonResponse({ error: 'Email is required when verifying a passcode' }, 400, env);
+    }
+    const limit = await checkCodeAttemptLimit(env, clientIp(request), email);
+    if (!limit.ok) return limit.response;
+  }
+
+  const data = await getAndDeleteMagicLink(env, credential, isCode ? email : undefined);
+  if (!data) {
+    if (isCode && email) await recordCodeAttempt(env, clientIp(request), email);
+    return jsonResponse({ error: 'Link expired or already used' }, 401, env);
+  }
+  if (isCode && email && data.email !== email) {
+    await recordCodeAttempt(env, clientIp(request), email);
+    return jsonResponse({ error: 'Link expired or already used' }, 401, env);
+  }
   if (Date.now() > data.expires) return jsonResponse({ error: 'Link expired' }, 401, env);
 
   const user = await getUser(env, data.userId);

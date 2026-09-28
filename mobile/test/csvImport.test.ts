@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 import {
   parseFlexibleDate,
   parseInventoryCsv,
   parseLeadingQuantity,
+  splitCsvRecords,
 } from '../src/items/csvImport.ts';
+
+const fixturePath = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/inventura-sample.csv');
 
 describe('parseFlexibleDate', () => {
   it('parses D.M.YYYY and spaced variants', () => {
@@ -13,6 +18,12 @@ describe('parseFlexibleDate', () => {
     assert.equal(parseFlexibleDate('31.12.2027'), '2027-12-31');
     assert.equal(parseFlexibleDate('28.6 2027'), '2027-06-28');
     assert.equal(parseFlexibleDate('1.4.2028'), '2028-04-01');
+  });
+
+  it('rejects impossible calendar dates', () => {
+    assert.equal(parseFlexibleDate('2027-02-30'), null);
+    assert.equal(parseFlexibleDate('31.2.2027'), null);
+    assert.equal(parseFlexibleDate('2027-13-01'), null);
   });
 });
 
@@ -34,6 +45,7 @@ describe('parseInventoryCsv', () => {
       ',,,',
       'starkin džem,,,otvorený 20.9.2026',
       'mrazený hrášok,,,20.10.2027',
+      'unknownloc item,,cellar,1.1.2028',
     ].join('\n');
 
     const { rows, skipped } = parseInventoryCsv(csv);
@@ -53,21 +65,26 @@ describe('parseInventoryCsv', () => {
 
     const peas = rows.find(r => r.name === 'mrazený hrášok');
     assert.equal(peas?.placement, 'freezer');
+
+    const cellar = rows.find(r => r.name === 'unknownloc item');
+    assert.equal(cellar?.placement, undefined);
   });
 
-  it('imports the uploaded inventory CSV with many pantry rows', () => {
-    const path =
-      '/home/ubuntu/.cursor/projects/workspace/uploads/Z_soby_na_byte_-_Invent_ra_-_Inventory_2b3b.csv';
-    let text: string;
-    try {
-      text = readFileSync(path, 'utf8');
-    } catch {
-      // Artifact path may be absent in CI — skip soft.
-      return;
-    }
+  it('keeps quoted fields that contain newlines as one record', () => {
+    const csv = 'jedlo,koľko,miesto,dátum\n"line1\nline2",,pantry,1.2.2028\n';
+    assert.equal(splitCsvRecords(csv).length, 2);
+    const { rows } = parseInventoryCsv(csv);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.name, 'line1\nline2');
+    assert.equal(rows[0]!.expiryDate, '2028-02-01');
+  });
+
+  it('imports the repository inventúra fixture', () => {
+    const text = readFileSync(fixturePath, 'utf8');
     const { rows } = parseInventoryCsv(text);
-    assert.ok(rows.length > 40);
+    assert.ok(rows.length >= 5);
     assert.ok(rows.some(r => r.name.toLowerCase().includes('oatly')));
+    assert.ok(rows.some(r => r.name.includes('multiline')));
     assert.ok(rows.every(r => r.name.trim().length > 0));
   });
 });

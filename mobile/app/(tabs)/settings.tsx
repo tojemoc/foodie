@@ -8,11 +8,12 @@ import { useSession } from '../../src/auth/session';
 import { API_BASE, fetchPrefs, updatePrefs } from '../../src/api/client';
 import { syncOnOpen, pushToRemote } from '../../src/items/sync';
 import { addItem, getItems, makeItem } from '../../src/items/store';
-import { parseInventoryCsv } from '../../src/items/csvImport';
+import { csvImportDedupeKey, parseInventoryCsv } from '../../src/items/csvImport';
 import { DEFAULT_PLACEMENTS } from '../../src/items/types';
 import {
   isDailyExpiryDigestScheduled,
   notifyExpiringSoonNow,
+  refreshDailyExpiryDigest,
   registerDailyExpiryDigest,
   unregisterDailyExpiryDigest,
 } from '../../src/notifications/expiryAlerts';
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
   const [status, setStatus] = useState('');
 
   const refresh = useCallback(async () => {
+    await refreshDailyExpiryDigest();
     setPushOn(await isDailyExpiryDigestScheduled());
     if (!session) {
       setEmailOn(false);
@@ -66,10 +68,15 @@ export default function SettingsScreen() {
 
   async function onDisablePush() {
     setBusy(true);
-    await unregisterDailyExpiryDigest();
+    setStatus('');
+    try {
+      await unregisterDailyExpiryDigest();
+      setPushOn(false);
+      setStatus('Local expiry notifications turned off.');
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Could not disable notifications');
+    }
     setBusy(false);
-    setPushOn(false);
-    setStatus('Local expiry notifications turned off.');
   }
 
   async function onToggleEmail() {
@@ -118,8 +125,25 @@ export default function SettingsScreen() {
       const placementMeta = Object.fromEntries(
         DEFAULT_PLACEMENTS.map(p => [p.id, p]),
       );
+      const existingKeys = new Set(
+        getItems().map(c =>
+          csvImportDedupeKey({
+            name: c.productName || c.name,
+            placement: c.placement,
+            expiryDate: c.expiryDate,
+          }),
+        ),
+      );
 
+      let added = 0;
+      let dupes = 0;
       for (const row of rows) {
+        const key = csvImportDedupeKey(row);
+        if (existingKeys.has(key)) {
+          dupes++;
+          continue;
+        }
+        existingKeys.add(key);
         const meta = placementMeta[row.placement || ''] ?? {
           emoji: '🥗',
           color: '#6B7280',
@@ -141,10 +165,15 @@ export default function SettingsScreen() {
             source: 'manual',
           }),
         );
+        added++;
       }
       await pushToRemote();
-      setStatus(`Imported ${rows.length} item(s)${skipped ? `, skipped ${skipped}` : ''}.`);
-      Alert.alert('Import complete', `Added ${rows.length} items from CSV.`);
+      await refreshDailyExpiryDigest();
+      const extra = [skipped && `${skipped} empty`, dupes && `${dupes} duplicate`]
+        .filter(Boolean)
+        .join(', ');
+      setStatus(`Imported ${added} item(s)${extra ? ` (${extra})` : ''}.`);
+      Alert.alert('Import complete', `Added ${added} items from CSV.`);
     } catch (err) {
       setStatus(err instanceof Error ? err.message : 'Import failed');
     }

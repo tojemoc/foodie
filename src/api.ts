@@ -54,7 +54,6 @@ export const registerPushSubscription = (body: {
 export interface UserPrefs {
   emailDigest: boolean;
   timezone: string;
-  lastDigestLocalDate?: string;
   updatedAt?: string;
 }
 

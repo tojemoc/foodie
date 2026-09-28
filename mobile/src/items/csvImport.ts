@@ -1,11 +1,8 @@
 /**
  * Inventory CSV import — Slovak inventúra format and English aliases.
+ * Keep in sync with src/items/csvImport.ts
  *
  * Expected header (flexible): jedlo/food, koľko/qty, miesto/location, dátum/date
- * Example rows:
- *   2x oatly,1 l,pantry,6.6.2027
- *   zavarané uhorky,,pantry,31.12.2027
- *   starkin džem,,,otvorený 20.9.2026
  */
 
 export interface CsvImportRow {
@@ -43,9 +40,46 @@ const PLACEMENT_MAP: Record<string, string> = {
   linka: 'counter',
 };
 
+/** Split full CSV text into records; quoted fields may contain newlines. */
+export function splitCsvRecords(text: string): string[] {
+  const src = text.replace(/^\uFEFF/, '');
+  const records: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i]!;
+    if (inQuotes) {
+      cur += ch;
+      if (ch === '"') {
+        if (src[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      cur += ch;
+      continue;
+    }
+    if (ch === '\n') {
+      records.push(cur.replace(/\r$/, ''));
+      cur = '';
+      continue;
+    }
+    if (ch === '\r') continue;
+    cur += ch;
+  }
+  if (cur.length) records.push(cur);
+  return records;
+}
+
 export function parseInventoryCsv(text: string): CsvImportResult {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
-  if (!lines.length) return { rows: [], skipped: 0 };
+  const records = splitCsvRecords(text);
+  if (!records.length) return { rows: [], skipped: 0 };
 
   let start = 0;
   let idxName = 0;
@@ -53,7 +87,7 @@ export function parseInventoryCsv(text: string): CsvImportResult {
   let idxPlace = 2;
   let idxDate = 3;
 
-  const first = parseCsvLine(lines[0] ?? '');
+  const first = parseCsvLine(records[0] ?? '');
   if (first.some(cell => HEADER_NAME.test(cell.trim()) || HEADER_DATE.test(cell.trim()))) {
     first.forEach((cell, i) => {
       const t = cell.trim();
@@ -68,8 +102,8 @@ export function parseInventoryCsv(text: string): CsvImportResult {
   const rows: CsvImportRow[] = [];
   let skipped = 0;
 
-  for (let i = start; i < lines.length; i++) {
-    const line = lines[i]?.trim() ?? '';
+  for (let i = start; i < records.length; i++) {
+    const line = records[i]?.trim() ?? '';
     if (!line || /^,+$/.test(line)) {
       skipped++;
       continue;
@@ -83,7 +117,6 @@ export function parseInventoryCsv(text: string): CsvImportResult {
 
     const parsedName = parseLeadingQuantity(rawName);
     if (parsedName.quantity === 0) {
-      // Explicit 0x … = out of stock — skip
       skipped++;
       continue;
     }
@@ -97,7 +130,6 @@ export function parseInventoryCsv(text: string): CsvImportResult {
 
     let expiryDate: string | undefined = parseFlexibleDate(dateCell) ?? undefined;
     if (!expiryDate && dateCell) {
-      // e.g. "otvorený 20.9.2026" — keep full text in notes, still try to extract a date
       noteParts.push(dateCell);
       const embedded = dateCell.match(/(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2,4})/);
       if (embedded) {
@@ -130,7 +162,6 @@ export function parseInventoryCsv(text: string): CsvImportResult {
   return { rows, skipped };
 }
 
-/** Split a CSV line respecting double-quoted fields. */
 export function parseCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = '';
@@ -171,13 +202,29 @@ export function parseLeadingQuantity(raw: string): { name: string; quantity?: nu
   return { name: m[2]!.trim(), quantity: Number(m[1]) };
 }
 
-/** Parse D.M.YYYY / D.M YYYY / YYYY-MM-DD into YYYY-MM-DD. */
+function isValidYmd(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  );
+}
+
 export function parseFlexibleDate(raw: string): string | null {
   const t = raw.trim();
   if (!t) return null;
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) {
+    const year = Number(iso[1]);
+    const month = Number(iso[2]);
+    const day = Number(iso[3]);
+    if (!isValidYmd(year, month, day)) return null;
+    return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  }
 
   const dmy = /^(\d{1,2})[.\-/](\d{1,2})[.\-/ ]+(\d{2,4})$/.exec(t);
   if (dmy) {
@@ -185,7 +232,7 @@ export function parseFlexibleDate(raw: string): string | null {
     if (year < 100) year += 2000;
     const month = Number(dmy[2]);
     const day = Number(dmy[1]);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    if (!isValidYmd(year, month, day)) return null;
     return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
@@ -195,7 +242,7 @@ export function parseFlexibleDate(raw: string): string | null {
 function normalizePlacement(raw: string): string | undefined {
   if (!raw) return undefined;
   const key = raw.trim().toLowerCase();
-  return PLACEMENT_MAP[key] ?? (['pantry', 'fridge', 'freezer', 'counter'].includes(key) ? key : key);
+  return PLACEMENT_MAP[key];
 }
 
 function inferPlacementFromName(name: string): string | undefined {
@@ -207,4 +254,17 @@ function inferPlacementFromName(name: string): string | undefined {
     return 'fridge';
   }
   return undefined;
+}
+
+/** Dedup key: name + placement + expiryDate (case-insensitive name/placement). */
+export function csvImportDedupeKey(row: {
+  name: string;
+  placement?: string;
+  expiryDate?: string;
+}): string {
+  return [
+    row.name.trim().toLowerCase(),
+    (row.placement ?? '').trim().toLowerCase(),
+    row.expiryDate ?? '',
+  ].join('|');
 }

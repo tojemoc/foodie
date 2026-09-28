@@ -1,9 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../../src/components/Button';
 import { useSession } from '../../src/auth/session';
 import { colors, spacing } from '../../src/theme/colors';
+
+const LAST_EMAIL_KEY = 'foodie_last_magic_email';
 
 export default function AuthScreen() {
   const { sendMagicLink, continueOffline } = useSession();
@@ -18,12 +21,14 @@ export default function AuthScreen() {
     setLoading(true);
     setError('');
     setDevCode('');
-    const res = await sendMagicLink(email);
+    const normalized = email.trim().toLowerCase();
+    const res = await sendMagicLink(normalized);
     setLoading(false);
     if (!res.ok) {
       setError(res.error ?? 'Could not send magic link');
       return;
     }
+    await AsyncStorage.setItem(LAST_EMAIL_KEY, normalized);
     setSent(true);
     if (res.code) setDevCode(res.code);
   }

@@ -1,4 +1,6 @@
-import type { Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone, UserPrefs } from '../types.js';
+import type {
+  Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone, UserPrefs, DigestDeliveryStamp,
+} from '../types.js';
 
 // ── User ─────────────────────────────────────────────────────────────────────
 
@@ -32,13 +34,24 @@ export async function getUserPrefs(env: Env, userId: string): Promise<UserPrefs>
   return {
     emailDigest: !!stored.emailDigest,
     timezone: stored.timezone?.trim() || DEFAULT_DIGEST_TIMEZONE,
-    lastDigestLocalDate: stored.lastDigestLocalDate,
     updatedAt: stored.updatedAt || new Date().toISOString(),
   };
 }
 
 export async function putUserPrefs(env: Env, userId: string, prefs: UserPrefs): Promise<void> {
   await env.FOODIE_KV.put(`prefs:${userId}`, JSON.stringify(prefs));
+}
+
+export async function getDigestStamp(env: Env, userId: string): Promise<DigestDeliveryStamp> {
+  return (await env.FOODIE_KV.get<DigestDeliveryStamp>(`digeststamp:${userId}`, 'json')) ?? {};
+}
+
+export async function putDigestStamp(
+  env: Env,
+  userId: string,
+  stamp: DigestDeliveryStamp,
+): Promise<void> {
+  await env.FOODIE_KV.put(`digeststamp:${userId}`, JSON.stringify(stamp));
 }
 
 // ── Credential ────────────────────────────────────────────────────────────────
@@ -67,33 +80,46 @@ export async function getAndDeleteChallenge(
 
 const MAGIC_TTL_SEC = 900;
 
+export function magicCodeKey(email: string, code: string): string {
+  return `magiccode:${email.trim().toLowerCase()}:${code.trim()}`;
+}
+
 export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void> {
   const body = JSON.stringify(data);
   await Promise.all([
     env.FOODIE_KV.put(`magiclink:${data.token}`, body, { expirationTtl: MAGIC_TTL_SEC }),
-    env.FOODIE_KV.put(`magiccode:${data.code}`, body, { expirationTtl: MAGIC_TTL_SEC }),
+    env.FOODIE_KV.put(magicCodeKey(data.email, data.code), body, { expirationTtl: MAGIC_TTL_SEC }),
   ]);
 }
 
-/** Consume by long token or 6-digit passcode; clears both indexes. */
+/** Consume by long token, or by email-scoped 6-digit passcode. */
 export async function getAndDeleteMagicLink(
-  env:   Env,
+  env: Env,
   tokenOrCode: string,
+  emailForCode?: string,
 ): Promise<MagicLinkData | null> {
   const raw = tokenOrCode.trim();
   if (!raw) return null;
 
   const isCode = /^\d{6}$/.test(raw);
-  const primaryKey = isCode ? `magiccode:${raw}` : `magiclink:${raw}`;
+  let primaryKey: string;
+  if (isCode) {
+    const email = emailForCode?.trim().toLowerCase();
+    if (!email) return null;
+    primaryKey = magicCodeKey(email, raw);
+  } else {
+    primaryKey = `magiclink:${raw}`;
+  }
+
   const data = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
   if (!data) return null;
 
   const token = data.token || (!isCode ? raw : '');
   const code  = data.code || (isCode ? raw : '');
+  const email = data.email || emailForCode?.trim().toLowerCase() || '';
   await Promise.all([
     token ? env.FOODIE_KV.delete(`magiclink:${token}`) : Promise.resolve(),
-    code  ? env.FOODIE_KV.delete(`magiccode:${code}`)  : Promise.resolve(),
-    // Always clear the key we read in case of legacy records without token/code fields.
+    code && email ? env.FOODIE_KV.delete(magicCodeKey(email, code)) : Promise.resolve(),
     env.FOODIE_KV.delete(primaryKey),
   ]);
   return data;

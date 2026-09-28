@@ -64,8 +64,11 @@ export const authMagicSend = (email: string) =>
     emailConfigured?: boolean;
   }>('/auth/magic/send', 'POST', { email });
 
-export const authMagicVerify = (token: string) =>
-  request<AuthResponse>('/auth/magic/verify', 'POST', { token });
+export const authMagicVerify = (token: string, email?: string) =>
+  request<AuthResponse>('/auth/magic/verify', 'POST', {
+    token,
+    ...(email ? { email: email.trim().toLowerCase() } : {}),
+  });
 
 export const authMe = () =>
   request<{ id: string; username: string; email: string }>('/auth/me', 'GET');
@@ -73,7 +76,6 @@ export const authMe = () =>
 export interface UserPrefs {
   emailDigest: boolean;
   timezone: string;
-  lastDigestLocalDate?: string;
   updatedAt?: string;
 }
 
