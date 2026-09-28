@@ -7,6 +7,17 @@ export interface User {
   createdAt: string;
 }
 
+/** Per-user notification / digest preferences (`prefs:{userId}`). */
+export interface UserPrefs {
+  /** Opt-in to the morning email digest (expires within the next week). */
+  emailDigest: boolean;
+  /** IANA timezone for 8:00 local delivery (default Europe/Bratislava). */
+  timezone: string;
+  /** Local calendar date (YYYY-MM-DD) of the last digest send. */
+  lastDigestLocalDate?: string;
+  updatedAt: string;
+}
+
 export interface Credential {
   userId:        string;
   publicKeyCose: string; // base64url

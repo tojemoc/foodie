@@ -65,10 +65,11 @@ See [`mobile/README.md`](mobile/README.md) and [`docs/ios-sidestore-distribution
 | Cloud-primary KV sync + localStorage offline cache | Done |
 | Last-write-wins merge + tombstones (multi-device) | Done |
 | Add / edit / delete items, search, export / import JSON | Done |
+| Inventúra CSV import (`jedlo,koľko,miesto,dátum`) | Done |
 | Two-step add wizard (details → placement) | Done |
 | Camera barcode scan + Open Food Facts | Done |
 | Expiry date OCR (Tesseract.js) | Done |
-| In-app + Web Push expiry alerts + morning digest | Done |
+| Web Push expiry alerts + opt-in daily email digest (~8:00 local, next 7 days) | Done |
 | Staging / production CI/CD | Done |
 
 ---
@@ -77,6 +78,8 @@ See [`mobile/README.md`](mobile/README.md) and [`docs/ios-sidestore-distribution
 
 - [x] **Expo native client** — SideStore-ready scaffold with OCR / multi-source lookup / offline produce DB
 - [x] Wire GitHub Pages to serve `altstore-source.json` + nightly.link IPA/APK install site after mobile publishes
+- [x] **Daily expiry recap** — opt-in email + push/local notifications around 8:00 local for items expiring within 7 days
+- [x] **CSV inventory import** — inventúra-style `jedlo,koľko,miesto,dátum` on PWA + mobile
 - [ ] Optional `@react-native-ml-kit/text-recognition` in the SideStore prebuild
 - [ ] Family / shared inventories
 - [ ] Passkey list/revoke on Worker; native passkey if/when practical

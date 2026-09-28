@@ -51,6 +51,19 @@ export const registerPushSubscription = (body: {
   keys: { p256dh: string; auth: string };
 }) => request<{ ok?: boolean; error?: string }>('/push/subscribe', 'POST', body);
 
+export interface UserPrefs {
+  emailDigest: boolean;
+  timezone: string;
+  lastDigestLocalDate?: string;
+  updatedAt?: string;
+}
+
+export const fetchPrefs = () =>
+  request<UserPrefs & { error?: string }>('/prefs', 'GET');
+
+export const updatePrefs = (body: { emailDigest?: boolean; timezone?: string }) =>
+  request<UserPrefs & { error?: string }>('/prefs', 'PUT', body);
+
 // ── WebAuthn JSON types (not yet in all TS libs) ──────────────────────────────
 // These mirror the browser API shapes but as plain JSON (serialised over the wire).
 

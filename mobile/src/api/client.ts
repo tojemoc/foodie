@@ -70,6 +70,19 @@ export const authMagicVerify = (token: string) =>
 export const authMe = () =>
   request<{ id: string; username: string; email: string }>('/auth/me', 'GET');
 
+export interface UserPrefs {
+  emailDigest: boolean;
+  timezone: string;
+  lastDigestLocalDate?: string;
+  updatedAt?: string;
+}
+
+export const fetchPrefs = () =>
+  request<UserPrefs>('/prefs', 'GET');
+
+export const updatePrefs = (body: { emailDigest?: boolean; timezone?: string }) =>
+  request<UserPrefs>('/prefs', 'PUT', body);
+
 export const fetchItems = () =>
   request<{ items: Item[]; tombstones: Tombstone[] }>('/items', 'GET');
 

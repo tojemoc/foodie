@@ -1,4 +1,4 @@
-import type { Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone } from '../types.js';
+import type { Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone, UserPrefs } from '../types.js';
 
 // ── User ─────────────────────────────────────────────────────────────────────
 
@@ -13,6 +13,33 @@ export const getUserIdByEmail = (env: Env, email: string) =>
 
 export const putEmailIndex = (env: Env, email: string, userId: string) =>
   env.FOODIE_KV.put(`email:${email}`, userId);
+
+// ── Notification / digest prefs ───────────────────────────────────────────────
+
+export const DEFAULT_DIGEST_TIMEZONE = 'Europe/Bratislava';
+
+export function defaultUserPrefs(): UserPrefs {
+  return {
+    emailDigest: false,
+    timezone: DEFAULT_DIGEST_TIMEZONE,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export async function getUserPrefs(env: Env, userId: string): Promise<UserPrefs> {
+  const stored = await env.FOODIE_KV.get<UserPrefs>(`prefs:${userId}`, 'json');
+  if (!stored) return defaultUserPrefs();
+  return {
+    emailDigest: !!stored.emailDigest,
+    timezone: stored.timezone?.trim() || DEFAULT_DIGEST_TIMEZONE,
+    lastDigestLocalDate: stored.lastDigestLocalDate,
+    updatedAt: stored.updatedAt || new Date().toISOString(),
+  };
+}
+
+export async function putUserPrefs(env: Env, userId: string, prefs: UserPrefs): Promise<void> {
+  await env.FOODIE_KV.put(`prefs:${userId}`, JSON.stringify(prefs));
+}
 
 // ── Credential ────────────────────────────────────────────────────────────────
 
