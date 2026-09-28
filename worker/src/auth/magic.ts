@@ -56,9 +56,9 @@ function clientIp(request: Request): string {
   );
 }
 
-/** Prefix for per-attempt KV slots (and legacy single counter key). */
+/** Prefix ending after email so `a@b.co` cannot match keys for `a@b.com`. */
 function codeAttemptPrefix(ip: string, email: string): string {
-  return `magicfail:${ip}:${email}`;
+  return `magicfail:${ip}:${email}:`;
 }
 
 /**
@@ -87,7 +87,7 @@ async function checkCodeAttemptLimit(
 
 async function recordCodeAttempt(env: Env, ip: string, email: string): Promise<void> {
   const slot = crypto.randomUUID();
-  await env.FOODIE_KV.put(`${codeAttemptPrefix(ip, email)}:${slot}`, '1', {
+  await env.FOODIE_KV.put(`${codeAttemptPrefix(ip, email)}${slot}`, '1', {
     expirationTtl: CODE_ATTEMPT_TTL_SEC,
   });
 }

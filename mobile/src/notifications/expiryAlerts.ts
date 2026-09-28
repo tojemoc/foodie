@@ -65,7 +65,6 @@ async function scheduleNextDigest(): Promise<void> {
     title: 'Foodie — expiring this week',
     body: body || 'Open Foodie to review items expiring in the next 7 days.',
     data: { type: 'expiry-digest' },
-    ...(Platform.OS === 'android' ? { channelId: 'expiry' } : {}),
   };
 
   let at = nextLocalEightAm();
@@ -76,6 +75,7 @@ async function scheduleNextDigest(): Promise<void> {
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: at,
+        ...(Platform.OS === 'android' ? { channelId: 'expiry' } : {}),
       },
     });
     at = new Date(at);
@@ -96,6 +96,12 @@ export async function registerDailyExpiryDigest(): Promise<{ ok: boolean; error?
     await AsyncStorage.setItem(DAILY_DIGEST_ENABLED_KEY, '1');
     return { ok: true };
   } catch (err) {
+    // Drop only the digests from this attempt; leave unrelated pending notifications.
+    try {
+      await cancelRollingDigests();
+    } catch {
+      // best-effort cleanup
+    }
     return {
       ok: false,
       error: err instanceof Error ? err.message : 'Could not schedule daily reminder',

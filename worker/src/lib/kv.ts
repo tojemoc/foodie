@@ -96,15 +96,16 @@ export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void>
  * Best-effort single-use claim via per-request KV slots.
  * Concurrent verifiers each write a claim key; only the lexicographically first
  * winner may consume the credential (Workers KV has no true CAS).
+ * Returns the winning claim key, or null if this request lost the race.
  */
-async function claimMagicCredential(env: Env, primaryKey: string): Promise<boolean> {
+async function claimMagicCredential(env: Env, primaryKey: string): Promise<string | null> {
   const claimId = crypto.randomUUID();
   const prefix = `magicclaim:${primaryKey}:`;
   const claimKey = `${prefix}${claimId}`;
   await env.FOODIE_KV.put(claimKey, '1', { expirationTtl: MAGIC_TTL_SEC });
   const listed = await env.FOODIE_KV.list({ prefix });
   const names = listed.keys.map(k => k.name).sort();
-  return names[0] === claimKey;
+  return names[0] === claimKey ? claimKey : null;
 }
 
 /** Consume by long token, or by email-scoped 6-digit passcode. */
@@ -127,11 +128,15 @@ export async function getAndDeleteMagicLink(
   }
 
   // Claim before read so concurrent requests cannot both verify the same credential.
-  const won = await claimMagicCredential(env, primaryKey);
-  if (!won) return null;
+  const claimKey = await claimMagicCredential(env, primaryKey);
+  if (!claimKey) return null;
 
   const data = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
-  if (!data) return null;
+  if (!data) {
+    // Release the claim so a later retry is not blocked until TTL expiry.
+    await env.FOODIE_KV.delete(claimKey);
+    return null;
+  }
 
   const token = data.token || (!isCode ? raw : '');
   const code  = data.code || (isCode ? raw : '');

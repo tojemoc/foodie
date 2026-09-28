@@ -89,11 +89,19 @@ describe('parseInventoryCsv', () => {
   });
 
   it('keeps invalid ISO dates in notes without day-first salvage', () => {
-    const csv = 'jedlo,koľko,miesto,dátum\nbadiso,,,2027-02-30\nnoteonly,,,otvorený 20.9.2026\n';
+    const csv = [
+      'jedlo,koľko,miesto,dátum',
+      'badiso,,,2027-02-30',
+      'isosuffix,,,expires 2027-02-30',
+      'noteonly,,,otvorený 20.9.2026',
+    ].join('\n');
     const { rows } = parseInventoryCsv(csv);
     const bad = rows.find(r => r.name === 'badiso');
     assert.equal(bad?.expiryDate, undefined);
     assert.match(bad?.notes ?? '', /2027-02-30/);
+    const suffix = rows.find(r => r.name === 'isosuffix');
+    assert.equal(suffix?.expiryDate, undefined);
+    assert.match(suffix?.notes ?? '', /2027-02-30/);
     const note = rows.find(r => r.name === 'noteonly');
     assert.equal(note?.expiryDate, '2026-09-20');
   });

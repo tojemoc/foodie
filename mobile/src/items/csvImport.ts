@@ -136,8 +136,8 @@ export function parseInventoryCsv(text: string): CsvImportResult {
     let expiryDate: string | undefined = parseFlexibleDate(dateCell) ?? undefined;
     if (!expiryDate && dateCell) {
       noteParts.push(dateCell);
-      // Invalid ISO dates must not be re-parsed via the day-first embedded fallback.
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateCell)) {
+      // Reject day-first salvage from ISO shapes (incl. suffixes of invalid YYYY-MM-DD).
+      if (!/\d{4}-\d{2}-\d{2}/.test(dateCell)) {
         const embedded = dateCell.match(/(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2,4})/);
         if (embedded) {
           expiryDate = parseFlexibleDate(`${embedded[1]}.${embedded[2]}.${embedded[3]}`) ?? undefined;
