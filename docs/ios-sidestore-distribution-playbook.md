@@ -48,7 +48,13 @@ land after uninstall + reinstall.
 Mitigation (same approach as [tojemoc/vmp](https://github.com/tojemoc/vmp)
 PR #691 / [tojemoc/floaty](https://github.com/tojemoc/floaty)): every CI IPA
 must ship a **strictly increasing** marketing version. Helper:
-`scripts/ios-sidestore-marketing-version.mjs`.
+`scripts/ios-sidestore-marketing-version.mjs`. The publish job refuses a
+release whose marketing version is not strictly greater than every
+already-published release tag (so SideStore and Android stay ordered).
+
+The Android job writes the same marketing version to `expo.version`
+(`versionName`) and sets `expo.android.versionCode` from the CI build
+number before prebuild.
 
 ## Install on iPhone
 

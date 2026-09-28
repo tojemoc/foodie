@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  isStrictlyGreaterMarketing,
+  maxMarketingVersion,
   sidestoreMarketingVersion,
   sidestoreWouldOfferUpdate,
 } from "./ios-sidestore-marketing-version.mjs";
@@ -44,5 +46,19 @@ describe("SideStore hasUpdate simulation (marketing version only)", () => {
     // Live foodie bug: both releases were version 3.0.0 with builds 2/3
     assert.equal(sidestoreWouldOfferUpdate("3.0.0", "3.0.0"), false);
     assert.equal(sidestoreWouldOfferUpdate("3.0.0", "3.0.3"), true);
+  });
+});
+
+describe("publish monotonic marketing version", () => {
+  it("picks the highest published marketing version", () => {
+    assert.equal(maxMarketingVersion(["3.0.0", "3.0.2", "3.0.10"]), "3.0.10");
+    assert.equal(maxMarketingVersion([]), null);
+  });
+
+  it("requires a strictly greater candidate before publish", () => {
+    assert.equal(isStrictlyGreaterMarketing(null, "3.0.1"), true);
+    assert.equal(isStrictlyGreaterMarketing("3.0.10", "3.0.11"), true);
+    assert.equal(isStrictlyGreaterMarketing("3.0.10", "3.0.10"), false);
+    assert.equal(isStrictlyGreaterMarketing("3.0.10", "3.0.9"), false);
   });
 });

@@ -60,15 +60,63 @@ export function sidestoreWouldOfferUpdate(installedMarketing, latestMarketing) {
   return false;
 }
 
+/**
+ * Highest SemanticVersion among marketing version strings, or null if empty.
+ * @param {Iterable<string>} versions
+ * @returns {string | null}
+ */
+export function maxMarketingVersion(versions) {
+  let best = null;
+  for (const raw of versions) {
+    const v = String(raw ?? "").trim();
+    if (!v) continue;
+    if (best === null || sidestoreWouldOfferUpdate(best, v)) {
+      best = v;
+    }
+  }
+  return best;
+}
+
+/**
+ * True when candidate is strictly greater than baseline (or baseline is absent).
+ * @param {string | null | undefined} baseline
+ * @param {string} candidate
+ */
+export function isStrictlyGreaterMarketing(baseline, candidate) {
+  if (baseline == null || String(baseline).trim() === "") {
+    return true;
+  }
+  return sidestoreWouldOfferUpdate(baseline, candidate);
+}
+
 function main(argv) {
-  const [, , base, build] = argv;
-  if (base === undefined || build === undefined) {
+  const [, , a, b] = argv;
+  if (a === "--assert-greater") {
+    const baseline = b;
+    const candidate = argv[4];
+    if (candidate === undefined) {
+      console.error(
+        "Usage: node scripts/ios-sidestore-marketing-version.mjs --assert-greater <baseline|''> <candidate>",
+      );
+      process.exit(1);
+    }
+    if (!isStrictlyGreaterMarketing(baseline, candidate)) {
+      console.error(
+        `marketing version ${candidate} is not strictly greater than published ${baseline || "(none)"}`,
+      );
+      process.exit(1);
+    }
+    process.stdout.write(`ok: ${candidate} > ${baseline || "(none)"}\n`);
+    return;
+  }
+  if (a === undefined || b === undefined) {
     console.error(
-      "Usage: node scripts/ios-sidestore-marketing-version.mjs <baseVersion> <buildNumber>",
+      "Usage: node scripts/ios-sidestore-marketing-version.mjs <baseVersion> <buildNumber>\n" +
+        "       node scripts/ios-sidestore-marketing-version.mjs --assert-greater <baseline|''> <candidate>",
     );
     process.exit(1);
   }
-  process.stdout.write(`${sidestoreMarketingVersion(base, build)}\n`);
+  process.stdout.write(`${sidestoreMarketingVersion(a, b)}\n`);
 }
 
 const entry = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;

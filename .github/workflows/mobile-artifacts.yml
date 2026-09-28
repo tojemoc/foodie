@@ -302,15 +302,47 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci
 
-      - name: Inject CI frontend host
+      - name: Parse mobile version
+        id: version
+        working-directory: ${{ github.workspace }}
+        env:
+          INPUT_BUILD: ${{ inputs.build_number }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          VERSION_BASE="$(node -p "require('./mobile/app.json').expo.version")"
+          if [ -n "${INPUT_BUILD}" ]; then
+            BUILD_NUMBER="${INPUT_BUILD}"
+          else
+            BUILD_NUMBER="${RUN_NUMBER}"
+          fi
+          if ! [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Android build number must be a positive integer without leading zeros. Found: $BUILD_NUMBER"
+            exit 1
+          fi
+          VERSION_NAME="$(node scripts/ios-sidestore-marketing-version.mjs "$VERSION_BASE" "$BUILD_NUMBER")"
+          echo "name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "base=$VERSION_BASE" >> "$GITHUB_OUTPUT"
+          echo "Version name: $VERSION_NAME (base $VERSION_BASE), build: $BUILD_NUMBER"
+
+      - name: Inject CI frontend host, marketing version, and versionCode
+        env:
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const host = process.env.FRONTEND_HOST;
+          const build = process.env.BUILD_NUMBER;
+          const versionName = process.env.VERSION_NAME;
           const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          // Match iOS / release label: versionName advertises the marketing version.
+          app.expo.version = versionName;
           app.expo.ios = app.expo.ios || {};
           app.expo.ios.associatedDomains = [`applinks:${host}`];
           app.expo.android = app.expo.android || {};
+          app.expo.android.versionCode = Number(build);
           app.expo.android.intentFilters = (app.expo.android.intentFilters || []).map((filter) => ({
             ...filter,
             data: (filter.data || []).map((entry) =>
@@ -400,6 +432,8 @@ jobs:
           INPUT_FLAVOR: ${{ inputs.flavor }}
           RUN_NUMBER: ${{ github.run_number }}
           ANDROID_JOB_RESULT: ${{ needs.build-android.result }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           mkdir -p release/ios release/android
@@ -421,6 +455,28 @@ jobs:
           # Must match CFBundleShortVersionString baked into the IPA (SideStore
           # compares marketing version only; buildVersion-only bumps stay Open).
           VERSION="$(node scripts/ios-sidestore-marketing-version.mjs "$VERSION_BASE" "$BUILD")"
+          # SideStore ignores equal marketing versions. Reject publish unless this
+          # candidate is strictly greater than every already-published tag version
+          # (also blocks same-run_number reruns that would overwrite assets under
+          # the same 3.0.N label). Build-only dispatches never reach this job.
+          LATEST="$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+              --jq '.[] | select(.draft|not) | .tag_name' \
+              | sed -nE 's/.*-v([0-9]+(\.[0-9]+)+)-build[0-9]+$/\1/p' \
+              | node --input-type=module -e '
+                  import { maxMarketingVersion } from "./scripts/ios-sidestore-marketing-version.mjs";
+                  const versions = [];
+                  for await (const chunk of process.stdin) {
+                    versions.push(...String(chunk).split(/\r?\n/));
+                  }
+                  const best = maxMarketingVersion(versions);
+                  process.stdout.write(best ?? "");
+                '
+          )"
+          if ! node scripts/ios-sidestore-marketing-version.mjs --assert-greater "${LATEST}" "$VERSION"; then
+            echo "::error::Refusing to publish marketing version ${VERSION}; latest published is ${LATEST:-none}. Bump build_number (or wait for a new run_number) so major.minor.patch increases."
+            exit 1
+          fi
           has_apk=false
           if [ "$ANDROID_JOB_RESULT" = "success" ]; then
             apk="$(find ./artifacts/android -name '*.apk' | head -1 || true)"
