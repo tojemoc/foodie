@@ -126,7 +126,11 @@
       <div class="settings-section">
         <h3>Reminders</h3>
         <button type="button" class="settings-item" id="enable-expiry-notifications" aria-label="Enable expiry alerts — request notification permission">
-          <div class="settings-item-left"><div class="settings-item-icon">🔔</div><div class="settings-item-text"><h4>Expiry alerts</h4><p>Background push when items expire soon (iOS: install Foodie to Home Screen first)</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">🔔</div><div class="settings-item-text"><h4>Expiry push alerts</h4><p>Background push for items expiring this week (iOS: add to Home Screen first)</p></div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="settings-item" id="enable-email-digest" aria-label="Register for daily email recap">
+          <div class="settings-item-left"><div class="settings-item-icon">✉️</div><div class="settings-item-text"><h4 id="email-digest-title">Daily email recap</h4><p id="email-digest-desc">Opt in to a morning email (~8:00 local) listing what expires in the next week</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
@@ -141,10 +145,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="settings-item" onclick="document.getElementById('import-input').click()">
-          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import items</h4><p>Restore from JSON backup</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import items</h4><p>JSON backup or inventúra CSV (jedlo, koľko, miesto, dátum)</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <input type="file" id="import-input" accept=".json" style="display:none" />
+        <input type="file" id="import-input" accept=".json,.csv,text/csv,application/json" style="display:none" />
       </div>
       <div class="settings-section">
         <h3>About</h3>

@@ -1,11 +1,19 @@
 import type { Item }                    from '../types.js';
 import { getItems, addItem, updateItem, removeItem, makeItem, touchItem } from '../items/store.js';
 import { pushToRemote }                from '../items/sync.js';
+import { parseInventoryCsv }           from '../items/csvImport.js';
 import { showToast }                   from './toast.js';
 import { isScanCameraSupported, startScan } from '../scanner/scanner.js';
 import { lookupBarcode }               from '../services/openfood.js';
 import { captureAndReadExpiryDate, isExpiryOcrSupported } from '../scanner/expiry.js';
 import { notifyExpiring } from '../notifications/expiry.js';
+
+const PLACEMENT_META: Record<string, { emoji: string; color: string }> = {
+  fridge:  { emoji: '🧊', color: '#3B82F6' },
+  freezer: { emoji: '❄️', color: '#0EA5E9' },
+  pantry:  { emoji: '🗄️', color: '#A16207' },
+  counter: { emoji: '🍎', color: '#16A34A' },
+};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -517,26 +525,63 @@ export async function importItems(e: Event): Promise<void> {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
   const text = await file.text();
+  const lower = file.name.toLowerCase();
   try {
-    const imported = JSON.parse(text) as Item[];
-    if (!Array.isArray(imported)) throw new Error('Not an array');
-    const existing = new Set(getItems().map(c => c.id));
-    let added = 0;
-    for (const c of imported) {
-      // Allow cards without barcode number if they are fresh template items
-      const hasValidNumber = c.number || isFreshTemplatePlacement(c.placement || '');
-      if (c.id && c.name && hasValidNumber && !existing.has(c.id)) {
-        addItem(c);
-        added++;
-      }
+    if (lower.endsWith('.csv') || looksLikeCsv(text)) {
+      await importCsvText(text);
+    } else {
+      await importJsonText(text);
     }
-    renderItems();
-    showToast(`Imported ${added} item(s)`);
-    await pushToRemote();
   } catch {
     showToast('Import failed: invalid file');
   }
   (e.target as HTMLInputElement).value = '';
+}
+
+function looksLikeCsv(text: string): boolean {
+  const first = text.split(/\r?\n/, 1)[0] ?? '';
+  return /jedlo|koľko|miesto|dátum/i.test(first) || (first.includes(',') && !first.trim().startsWith('['));
+}
+
+async function importJsonText(text: string): Promise<void> {
+  const imported = JSON.parse(text) as Item[];
+  if (!Array.isArray(imported)) throw new Error('Not an array');
+  const existing = new Set(getItems().map(c => c.id));
+  let added = 0;
+  for (const c of imported) {
+    const hasValidNumber = c.number || isFreshTemplatePlacement(c.placement || '');
+    if (c.id && c.name && hasValidNumber && !existing.has(c.id)) {
+      addItem(c);
+      added++;
+    }
+  }
+  renderItems();
+  showToast(`Imported ${added} item(s)`);
+  await pushToRemote();
+}
+
+async function importCsvText(text: string): Promise<void> {
+  const { rows, skipped } = parseInventoryCsv(text);
+  let added = 0;
+  for (const row of rows) {
+    const meta = PLACEMENT_META[row.placement || ''] ?? { emoji: '🥗', color: '#6B7280' };
+    addItem(makeItem({
+      name: row.name,
+      productName: row.name,
+      number: '',
+      format: 'MANUAL',
+      category: row.placement || 'grocery',
+      notes: row.notes,
+      expiryDate: row.expiryDate,
+      placement: row.placement,
+      color: meta.color,
+      emoji: meta.emoji,
+    }));
+    added++;
+  }
+  renderItems();
+  showToast(`Imported ${added} from CSV${skipped ? ` (${skipped} skipped)` : ''}`);
+  await pushToRemote();
 }
 
 // ── DOM helpers ───────────────────────────────────────────────────────────────

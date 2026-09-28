@@ -75,4 +75,4 @@ cd mobile && EXPO_PUBLIC_API_URL=http://127.0.0.1:8787 npx expo start
 - Staging: push to `main` → `.github/workflows/staging.yml`
 - Production: tag `v*` → `.github/workflows/release.yml`
 - Mobile IPA: workflow_dispatch → `.github/workflows/mobile-artifacts.yml`
-- Cron digest: `[triggers] crons = ["0 6 * * *"]` in `worker/wrangler.toml`
+- Cron digest: hourly `[triggers] crons = ["0 * * * *"]` in `worker/wrangler.toml` — delivers around 08:00 in each user’s `prefs.timezone` (default `Europe/Bratislava`) for items expiring within 7 days; email requires `prefs.emailDigest`

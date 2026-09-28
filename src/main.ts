@@ -15,6 +15,7 @@ import {
 import { showToast }                from './ui/toast.js';
 import { notifyExpiring }            from './notifications/expiry.js';
 import { enableWebPush, reconcileWebPush, isPushSupported, isIosSafari, isStandaloneDisplay } from './notifications/push.js';
+import { fetchPrefs, updatePrefs } from './api.js';
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
@@ -160,9 +161,15 @@ function wire(): void {
     });
   });
 
+  on('enable-email-digest', 'click', () => {
+    void toggleEmailDigest();
+  });
+
   // Settings
   on('export-btn',  'click', () => exportItems());
   on('import-input','change', e => importItems(e));
+
+  void refreshEmailDigestUi();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -240,6 +247,65 @@ function requestForegroundNotificationPermission(): void {
   }
 
   void Notification.requestPermission().then(finish);
+}
+
+function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Bratislava';
+  } catch {
+    return 'Europe/Bratislava';
+  }
+}
+
+async function refreshEmailDigestUi(): Promise<void> {
+  const title = document.getElementById('email-digest-title');
+  const desc = document.getElementById('email-digest-desc');
+  if (!title || !desc) return;
+
+  if (!getSession()?.token) {
+    title.textContent = 'Daily email recap';
+    desc.textContent = 'Sign in to register for a morning email (~8:00 local) of what expires in the next week';
+    return;
+  }
+
+  const prefs = await fetchPrefs();
+  if (prefs.error) {
+    desc.textContent = 'Could not load digest preference — try again after syncing';
+    return;
+  }
+
+  if (prefs.emailDigest) {
+    title.textContent = 'Daily email recap · on';
+    desc.textContent = `Enabled — ~8:00 ${prefs.timezone || browserTimezone()}, items expiring within 7 days. Tap to turn off.`;
+  } else {
+    title.textContent = 'Daily email recap';
+    desc.textContent = 'Tap to register — morning email (~8:00 local) listing what expires in the next week';
+  }
+}
+
+async function toggleEmailDigest(): Promise<void> {
+  if (!getSession()?.token) {
+    showToast('Sign in to register for the daily email recap');
+    return;
+  }
+  const current = await fetchPrefs();
+  if (current.error) {
+    showToast(current.error);
+    return;
+  }
+  const next = !current.emailDigest;
+  const updated = await updatePrefs({
+    emailDigest: next,
+    timezone: browserTimezone(),
+  });
+  if (updated.error) {
+    showToast(updated.error);
+    return;
+  }
+  showToast(next
+    ? 'Daily email recap registered — ~8:00 local, next 7 days'
+    : 'Daily email recap turned off');
+  await refreshEmailDigestUi();
 }
 
 // ── Run ───────────────────────────────────────────────────────────────────────

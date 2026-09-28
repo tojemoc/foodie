@@ -1,14 +1,19 @@
-import type { Env, User, Item } from '../types.js';
+import type { Env, User, Item, UserPrefs } from '../types.js';
 import {
   getItems as kvGetItems,
   getPushSubscriptions,
   deletePushSubscription,
+  getUserPrefs,
+  putUserPrefs,
+  DEFAULT_DIGEST_TIMEZONE,
 } from '../lib/kv.js';
 import { sendBrevoEmail } from '../lib/brevo.js';
 import { sendPushNotification, PushSendError } from '../lib/webpush.js';
 
-/** Max inclusive day offset from UTC "today" (0 = today). Spans `DIGEST_DAYS + 1` calendar days. */
-const DIGEST_DAYS = 2;
+/** Inclusive day offset from local "today" (0 = today) → next 7 calendar days. */
+const DIGEST_DAYS = 6;
+/** Local hour (0–23) when the digest should fire. */
+const DIGEST_LOCAL_HOUR = 8;
 
 interface ExpiringRow {
   name: string;
@@ -16,10 +21,14 @@ interface ExpiringRow {
   placement: string;
 }
 
+interface LocalClock {
+  hour: number;
+  date: string; // YYYY-MM-DD in the given timezone
+}
+
 /**
- * Daily cron: email + Web Push each user a list of items expiring soon.
- * Email requires BREVO_API_KEY; push requires VAPID keys + a stored subscription.
- * Iterates KV keys with prefix `user:`.
+ * Hourly cron: for each user whose local clock is ~08:00, email + Web Push a
+ * list of items expiring within the next week (opt-in email via prefs).
  */
 export async function runExpiryDigest(env: Env): Promise<void> {
   const canEmail = !!env.BREVO_API_KEY;
@@ -30,10 +39,12 @@ export async function runExpiryDigest(env: Env): Promise<void> {
     return;
   }
 
+  const now = new Date();
   let cursor: string | undefined;
   let processed = 0;
   let emailsSent = 0;
   let pushesSent = 0;
+  let skippedHour = 0;
 
   do {
     const list = await env.FOODIE_KV.list({ prefix: 'user:', cursor });
@@ -44,20 +55,34 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       const user = await env.FOODIE_KV.get<User>(key, 'json');
       if (!user?.email) continue;
 
+      const prefs = await getUserPrefs(env, userId);
+      const clock = localClock(now, prefs.timezone || DEFAULT_DIGEST_TIMEZONE);
+
+      // Only deliver around 8:00 local; mark the day so re-runs in the same hour don't spam.
+      if (clock.hour !== DIGEST_LOCAL_HOUR) {
+        skippedHour++;
+        continue;
+      }
+      if (prefs.lastDigestLocalDate === clock.date) continue;
+
       const items = (await kvGetItems(env, userId)) ?? [];
-      const expiring = filterExpiringSoon(items);
-      if (!expiring.length) continue;
+      const expiring = filterExpiringSoon(items, clock.date);
+      if (!expiring.length) {
+        // Still stamp the day so empty inventories don't get re-scanned every minute of hour 8.
+        await stampDigestDay(env, userId, prefs, clock.date);
+        continue;
+      }
 
       processed++;
 
-      if (canEmail) {
+      if (canEmail && prefs.emailDigest) {
         const html = buildDigestHtml(expiring, env.FRONTEND_ORIGIN || 'https://foodie-prod.pages.dev');
         const result = await sendBrevoEmail({
           apiKey:    env.BREVO_API_KEY!,
           to:        user.email,
           fromEmail: env.EMAIL_FROM      || 'foodie@tjm.sk',
           fromName:  env.EMAIL_FROM_NAME || 'Foodie',
-          subject:   `Foodie — ${expiring.length} item(s) expiring in the next ${DIGEST_DAYS + 1} days`,
+          subject:   `Foodie — ${expiring.length} item(s) expiring in the next week`,
           html,
         });
         if (result.ok) emailsSent++;
@@ -65,16 +90,59 @@ export async function runExpiryDigest(env: Env): Promise<void> {
       }
 
       if (canPush) {
-        const n = await sendExpiryPush(env, userId, expiring);
-        pushesSent += n;
+        pushesSent += await sendExpiryPush(env, userId, expiring);
       }
+
+      await stampDigestDay(env, userId, prefs, clock.date);
     }
     cursor = list.list_complete ? undefined : list.cursor;
   } while (cursor);
 
   console.log(
-    `expiry-digest: done — users with expiring items ${processed}, emails ${emailsSent}, pushes ${pushesSent}`,
+    `expiry-digest: done — delivered users ${processed}, emails ${emailsSent}, pushes ${pushesSent}, wrong-hour ${skippedHour}`,
   );
+}
+
+async function stampDigestDay(
+  env: Env,
+  userId: string,
+  prefs: UserPrefs,
+  localDate: string,
+): Promise<void> {
+  if (prefs.lastDigestLocalDate === localDate) return;
+  await putUserPrefs(env, userId, {
+    ...prefs,
+    lastDigestLocalDate: localDate,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export function localClock(now: Date, timeZone: string): LocalClock {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now);
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+    const year = get('year');
+    const month = get('month');
+    const day = get('day');
+    const hour = Number(get('hour'));
+    return {
+      hour: Number.isFinite(hour) ? hour : -1,
+      date: `${year}-${month}-${day}`,
+    };
+  } catch {
+    // Fall back to UTC
+    return {
+      hour: now.getUTCHours(),
+      date: now.toISOString().slice(0, 10),
+    };
+  }
 }
 
 async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Promise<number> {
@@ -84,7 +152,7 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
   const first = rows[0]!;
   const more = rows.length > 1 ? ` (+${rows.length - 1} more)` : '';
   const payload = {
-    title: 'Foodie — expiring soon',
+    title: 'Foodie — expiring this week',
     body:  `${first.name} expires ${first.expiry}${more}`,
     url:   '/',
     tag:   'foodie-expiry',
@@ -117,9 +185,10 @@ async function sendExpiryPush(env: Env, userId: string, rows: ExpiringRow[]): Pr
   return sent;
 }
 
-function filterExpiringSoon(items: Item[]): ExpiringRow[] {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+/** Exported for unit tests. `todayIso` is local YYYY-MM-DD. */
+export function filterExpiringSoon(items: Item[], todayIso: string): ExpiringRow[] {
+  const today = parseIsoDateUtc(todayIso);
+  if (!today) return [];
   const out: ExpiringRow[] = [];
 
   for (const c of items) {
@@ -157,9 +226,9 @@ function buildDigestHtml(rows: ExpiringRow[], appOrigin: string): string {
 
   return `
     <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:28px 20px;background:#fafafa">
-      <h1 style="font-size:22px;font-weight:700;margin:0 0 8px;color:#0a0a0f">Expiring soon</h1>
+      <h1 style="font-size:22px;font-weight:700;margin:0 0 8px;color:#0a0a0f">Expiring this week</h1>
       <p style="color:#555;margin:0 0 20px;line-height:1.5">
-        Here are items in your Foodie list expiring in the next <strong>${DIGEST_DAYS + 1}</strong> calendar days (including today).
+        Your daily Foodie recap — items expiring in the next <strong>7</strong> calendar days (including today).
       </p>
       <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
         <thead>
@@ -177,7 +246,8 @@ function buildDigestHtml(rows: ExpiringRow[], appOrigin: string): string {
         </a>
       </p>
       <p style="color:#999;font-size:12px;margin:24px 0 0;line-height:1.5">
-        You receive this because you have a Foodie account. Items are read from your last cloud sync.
+        Sent around 8:00 in your timezone because you registered for the daily email recap.
+        Items come from your last cloud sync.
       </p>
     </div>`;
 }

@@ -3,9 +3,10 @@ main                  = "src/index.ts"
 compatibility_date    = "2024-01-01"
 compatibility_flags   = ["nodejs_compat"]
 
-# Daily expiry digest email (UTC). Adjust to your preferred morning hour.
+# Hourly tick — expiry digest delivers around 08:00 in each user's timezone
+# (prefs.timezone, default Europe/Bratislava) for items expiring within 7 days.
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 * * * *"]
 
 # ── Production KV ─────────────────────────────────────────────
 [[kv_namespaces]]
@@ -49,7 +50,7 @@ EMAIL_FROM       = "foodie@tjm.sk"
 EMAIL_FROM_NAME  = "Foodie Staging"
 
 [env.staging.triggers]
-crons = ["0 6 * * *"]
+crons = ["0 * * * *"]
 
 # ── Local dev ──────────────────────────────────────────────────
 [dev]
