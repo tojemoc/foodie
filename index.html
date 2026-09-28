@@ -78,6 +78,21 @@
     </div>
   </div>
 
+  <!-- ═══ MAGIC HANDOFF (token not consumed until user confirms) ═══ -->
+  <div id="magic-handoff" class="magic-verifying" style="display:none">
+    <div class="auth-logo">Foodie<span>.</span></div>
+    <h2 style="margin:0;font-size:22px">Finish sign-in</h2>
+    <p id="magic-handoff-lead" style="color:var(--muted);max-width:360px;line-height:1.55;margin:0">
+      Open the Foodie app (SideStore), or continue in this browser. The link is only used once — do not open it in both.
+    </p>
+    <button class="passkey-btn" id="magic-open-app-btn" type="button">Open Foodie app</button>
+    <button class="magic-btn" id="magic-continue-web-btn" type="button">Continue in this browser</button>
+    <p style="color:var(--muted);font-size:13px;max-width:360px;line-height:1.5;margin:0">
+      Prefer typing? In the app choose <strong>Paste / open verify</strong> and enter the 6-digit passcode from the email.
+    </p>
+    <div class="auth-error" id="magic-handoff-error"></div>
+  </div>
+
   <!-- ═══ MAGIC VERIFYING ═══ -->
   <div id="magic-verifying" class="magic-verifying" style="display:none">
     <div class="spinner"></div>
@@ -126,7 +141,11 @@
       <div class="settings-section">
         <h3>Reminders</h3>
         <button type="button" class="settings-item" id="enable-expiry-notifications" aria-label="Enable expiry alerts — request notification permission">
-          <div class="settings-item-left"><div class="settings-item-icon">🔔</div><div class="settings-item-text"><h4>Expiry alerts</h4><p>Background push when items expire soon (iOS: install Foodie to Home Screen first)</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">🔔</div><div class="settings-item-text"><h4>Expiry push alerts</h4><p>Background push for items expiring this week (iOS: add to Home Screen first)</p></div></div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button type="button" class="settings-item" id="enable-email-digest" aria-label="Register for daily email recap">
+          <div class="settings-item-left"><div class="settings-item-icon">✉️</div><div class="settings-item-text"><h4 id="email-digest-title">Daily email recap</h4><p id="email-digest-desc">Opt in to a morning email (~8:00 local) listing what expires in the next week</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
@@ -141,10 +160,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="settings-item" onclick="document.getElementById('import-input').click()">
-          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import items</h4><p>Restore from JSON backup</p></div></div>
+          <div class="settings-item-left"><div class="settings-item-icon">📥</div><div class="settings-item-text"><h4>Import items</h4><p>JSON backup or inventúra CSV (jedlo, koľko, miesto, dátum)</p></div></div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7070a0" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <input type="file" id="import-input" accept=".json" style="display:none" />
+        <input type="file" id="import-input" accept=".json,.csv,text/csv,application/json" style="display:none" />
       </div>
       <div class="settings-section">
         <h3>About</h3>

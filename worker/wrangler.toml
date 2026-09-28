@@ -3,14 +3,24 @@ main                  = "src/index.ts"
 compatibility_date    = "2024-01-01"
 compatibility_flags   = ["nodejs_compat"]
 
-# Daily expiry digest email (UTC). Adjust to your preferred morning hour.
+# Hourly tick — expiry digest delivers around 08:00 in each user's timezone
+# (prefs.timezone, default Europe/Bratislava) for items expiring within 7 days.
 [triggers]
-crons = ["0 6 * * *"]
+crons = ["0 * * * *"]
 
 # ── Production KV ─────────────────────────────────────────────
 [[kv_namespaces]]
 binding = "FOODIE_KV"
 id      = "c10dfc1b686d4d95a207bc18f5f96573"
+
+# Atomic single-use magic-link / passcode consume (one DO per credential key).
+[[durable_objects.bindings]]
+name = "MAGIC_LINK_GATE"
+class_name = "MagicLinkGate"
+
+[[migrations]]
+tag = "v1-magic-link-gate"
+new_sqlite_classes = ["MagicLinkGate"]
 
 # ── Production vars ────────────────────────────────────────────
 [vars]
@@ -28,6 +38,9 @@ EMAIL_FROM_NAME  = "Foodie Team"
 #   wrangler secret put VAPID_PUBLIC_KEY
 # Or add VAPID_PUBLIC_KEY under [vars] once generated.
 # Generate a pair locally with Web Crypto (see README).
+#
+# Local-only (never enable in prod): MAGIC_DEV_ECHO=1 in .dev.vars echoes
+# magic token/code when BREVO_API_KEY is unset.
 
 # ── Staging environment ────────────────────────────────────────
 # Deploy with: wrangler deploy --env staging
@@ -42,6 +55,10 @@ name = "foodie-api-staging"
 binding = "FOODIE_KV"
 id      = "f14a4873b1144683b90317d75b6a79ab"
 
+[[env.staging.durable_objects.bindings]]
+name = "MAGIC_LINK_GATE"
+class_name = "MagicLinkGate"
+
 [env.staging.vars]
 FRONTEND_ORIGIN  = "https://foodie-staging.pages.dev"
 FRONTEND_RP_ID   = "foodie-staging.pages.dev"
@@ -49,7 +66,7 @@ EMAIL_FROM       = "foodie@tjm.sk"
 EMAIL_FROM_NAME  = "Foodie Staging"
 
 [env.staging.triggers]
-crons = ["0 6 * * *"]
+crons = ["0 * * * *"]
 
 # ── Local dev ──────────────────────────────────────────────────
 [dev]

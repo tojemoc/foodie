@@ -1,4 +1,6 @@
-import type { Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone } from '../types.js';
+import type {
+  Env, User, Credential, ChallengeData, MagicLinkData, Item, Tombstone, UserPrefs, DigestDeliveryStamp,
+} from '../types.js';
 
 // ── User ─────────────────────────────────────────────────────────────────────
 
@@ -13,6 +15,44 @@ export const getUserIdByEmail = (env: Env, email: string) =>
 
 export const putEmailIndex = (env: Env, email: string, userId: string) =>
   env.FOODIE_KV.put(`email:${email}`, userId);
+
+// ── Notification / digest prefs ───────────────────────────────────────────────
+
+export const DEFAULT_DIGEST_TIMEZONE = 'Europe/Bratislava';
+
+export function defaultUserPrefs(): UserPrefs {
+  return {
+    emailDigest: false,
+    timezone: DEFAULT_DIGEST_TIMEZONE,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export async function getUserPrefs(env: Env, userId: string): Promise<UserPrefs> {
+  const stored = await env.FOODIE_KV.get<UserPrefs>(`prefs:${userId}`, 'json');
+  if (!stored) return defaultUserPrefs();
+  return {
+    emailDigest: !!stored.emailDigest,
+    timezone: stored.timezone?.trim() || DEFAULT_DIGEST_TIMEZONE,
+    updatedAt: stored.updatedAt || new Date().toISOString(),
+  };
+}
+
+export async function putUserPrefs(env: Env, userId: string, prefs: UserPrefs): Promise<void> {
+  await env.FOODIE_KV.put(`prefs:${userId}`, JSON.stringify(prefs));
+}
+
+export async function getDigestStamp(env: Env, userId: string): Promise<DigestDeliveryStamp> {
+  return (await env.FOODIE_KV.get<DigestDeliveryStamp>(`digeststamp:${userId}`, 'json')) ?? {};
+}
+
+export async function putDigestStamp(
+  env: Env,
+  userId: string,
+  stamp: DigestDeliveryStamp,
+): Promise<void> {
+  await env.FOODIE_KV.put(`digeststamp:${userId}`, JSON.stringify(stamp));
+}
 
 // ── Credential ────────────────────────────────────────────────────────────────
 
@@ -38,16 +78,54 @@ export async function getAndDeleteChallenge(
 
 // ── Magic link ────────────────────────────────────────────────────────────────
 
-export const putMagicLink = (env: Env, token: string, data: MagicLinkData) =>
-  env.FOODIE_KV.put(`magiclink:${token}`, JSON.stringify(data), { expirationTtl: 900 });
+const MAGIC_TTL_SEC = 900;
 
+export function magicCodeKey(email: string, code: string): string {
+  return `magiccode:${email.trim().toLowerCase()}:${code.trim()}`;
+}
+
+export async function putMagicLink(env: Env, data: MagicLinkData): Promise<void> {
+  const body = JSON.stringify(data);
+  await Promise.all([
+    env.FOODIE_KV.put(`magiclink:${data.token}`, body, { expirationTtl: MAGIC_TTL_SEC }),
+    env.FOODIE_KV.put(magicCodeKey(data.email, data.code), body, { expirationTtl: MAGIC_TTL_SEC }),
+  ]);
+}
+
+/** Consume by long token, or by email-scoped 6-digit passcode (atomic via DO). */
 export async function getAndDeleteMagicLink(
-  env:   Env,
-  token: string,
+  env: Env,
+  tokenOrCode: string,
+  emailForCode?: string,
 ): Promise<MagicLinkData | null> {
-  const data = await env.FOODIE_KV.get<MagicLinkData>(`magiclink:${token}`, 'json');
-  if (data) await env.FOODIE_KV.delete(`magiclink:${token}`);
-  return data;
+  const raw = tokenOrCode.trim();
+  if (!raw) return null;
+
+  const isCode = /^\d{6}$/.test(raw);
+  let primaryKey: string;
+  if (isCode) {
+    const email = emailForCode?.trim().toLowerCase();
+    if (!email) return null;
+    primaryKey = magicCodeKey(email, raw);
+  } else {
+    primaryKey = `magiclink:${raw}`;
+  }
+
+  // Peek only to route token + passcode to the same DO instance.
+  const peek = await env.FOODIE_KV.get<MagicLinkData>(primaryKey, 'json');
+  if (!peek?.token) return null;
+
+  // Serialized consume keyed by token so link and passcode cannot both succeed.
+  const id = env.MAGIC_LINK_GATE.idFromName(peek.token);
+  const stub = env.MAGIC_LINK_GATE.get(id);
+  const res = await stub.fetch('https://magic-link-gate/consume', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ primaryKey }),
+  });
+  if (!res.ok) return null;
+  const body = await res.json<{ data: MagicLinkData | null }>();
+  return body.data ?? null;
 }
 
 // ── Items (legacy KV key `cards:` still read for migration) ───────────────────
@@ -194,7 +272,7 @@ export interface StoredPushSubscription {
   createdAt: string;
 }
 
-async function endpointKeyHash(endpoint: string): Promise<string> {
+export async function endpointKeyHash(endpoint: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
   return [...new Uint8Array(digest)]
     .map(b => b.toString(16).padStart(2, '0'))

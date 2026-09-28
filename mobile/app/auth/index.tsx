@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -5,32 +6,43 @@ import { Button } from '../../src/components/Button';
 import { useSession } from '../../src/auth/session';
 import { colors, spacing } from '../../src/theme/colors';
 
+const LAST_EMAIL_KEY = 'foodie_last_magic_email';
+
 export default function AuthScreen() {
   const { sendMagicLink, continueOffline } = useSession();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function onSend() {
     setLoading(true);
     setError('');
-    const res = await sendMagicLink(email);
+    setDevCode('');
+    const normalized = email.trim().toLowerCase();
+    const res = await sendMagicLink(normalized);
     setLoading(false);
     if (!res.ok) {
       setError(res.error ?? 'Could not send magic link');
       return;
     }
+    try {
+      await AsyncStorage.setItem(LAST_EMAIL_KEY, normalized);
+    } catch {
+      // Still show send confirmation — email was already delivered.
+    }
     setSent(true);
+    if (res.code) setDevCode(res.code);
   }
 
   return (
     <View style={styles.screen}>
       <Text style={styles.title}>Foodie</Text>
       <Text style={styles.lead}>
-        Passwordless sign-in. We email a one-time link — open it on this device to sync
-        your inventory.
+        Passwordless sign-in. We email a one-time link and a 6-digit passcode —
+        open the foodie:// link on this device, or paste the passcode on Verify.
       </Text>
       <TextInput
         style={styles.input}
@@ -45,7 +57,9 @@ export default function AuthScreen() {
       {!!error && <Text style={styles.error}>{error}</Text>}
       {sent ? (
         <Text style={styles.ok}>
-          Link sent. Open it on this phone, or paste the token on the verify screen.
+          {devCode
+            ? `Dev / no-email mode — passcode ${devCode}. Use Paste / open verify.`
+            : 'Link sent. Open the foodie:// link or enter the 6-digit passcode on Verify. Do not open the web link in a browser first if you want the app session.'}
         </Text>
       ) : (
         <Button title="Email magic link" onPress={() => void onSend()} loading={loading} disabled={!email.includes('@')} />

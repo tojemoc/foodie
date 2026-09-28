@@ -30,3 +30,17 @@ export function generateRandomToken(): string {
   crypto.getRandomValues(buf);
   return bufferToBase64url(buf);
 }
+
+/** Six-digit confirmation code (shown next to the magic link / deep link). */
+export function generateOtpCode(): string {
+  // Rejection sampling keeps the distribution uniform over [0, 1e6).
+  const range = 1_000_000;
+  const limit = Math.floor(0x1_0000_0000 / range) * range;
+  const buf = new Uint32Array(1);
+  let value = 0;
+  do {
+    crypto.getRandomValues(buf);
+    value = buf[0]!;
+  } while (value >= limit);
+  return String(value % range).padStart(6, '0');
+}
