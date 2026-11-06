@@ -1,4 +1,5 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import { NativeModules } from 'react-native';
 import { bestExpiryDate, extractDates, type DateExtractionResult } from './dateExtraction';
 
 export interface OcrResult {
@@ -34,8 +35,13 @@ export async function recognizeTextFromImageUri(uri: string): Promise<OcrResult>
   };
 }
 
+/** Return the on-device recognizer, or null when the native module isn't linked. */
 async function resolveRecognizer(): Promise<Recognizer | null> {
   try {
+    // The JS bundle ships even when the native module is absent (e.g. a build
+    // where the pod/gradle package wasn't autolinked) — require() succeeds and
+    // only the native call fails, so check the native side explicitly.
+    if (!NativeModules?.TextRecognition) return null;
     // Static require so Metro can resolve the optional native module.
     // Absent in Expo Go until prebuild + pod install — catch preserves fallback.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
