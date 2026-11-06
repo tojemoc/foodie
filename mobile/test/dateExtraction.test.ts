@@ -42,6 +42,12 @@ describe('fixOcrMistakes', () => {
     assert.match(fixOcrMistakes('EXP FEB26'), /FEB26/);
     assert.match(fixOcrMistakes('MHD DEZ2026'), /DEZ2026/);
   });
+
+  it('fixes confusable letters between a digit and a glued month name', () => {
+    assert.match(fixOcrMistakes('USE BY 3OJAN27'), /30JAN27/);
+    assert.match(fixOcrMistakes('USE BY l5DEC26'), /15DEC26/);
+    assert.match(fixOcrMistakes('EXP 1lJAN27'), /11JAN27/);
+  });
 });
 
 describe('extractDates', () => {

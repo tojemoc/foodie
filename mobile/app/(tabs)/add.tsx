@@ -31,6 +31,7 @@ import { colors, spacing } from '../../src/theme/colors';
 
 type Step = 'choose' | 'barcode' | 'produce' | 'product' | 'expiry-cam' | 'expiry' | 'placement' | 'review';
 
+/** Guided add-item flow: barcode / produce / manual → details → expiry → placement → review. */
 export default function AddItemScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
@@ -163,6 +164,7 @@ export default function AddItemScreen() {
     }
   }, []);
 
+/** Fill the form from a recognized produce match (name, qty, shelf life, placement). */
   function applyProduceMatch(m: ProduceMatch) {
     setSelectedProduceId(m.entry.id);
     setName(m.entry.name);

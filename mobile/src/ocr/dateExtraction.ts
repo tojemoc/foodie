@@ -44,20 +44,24 @@ const EXPIRY_KEYWORDS = [
   'PRZED', 'NAJLEPIEJ SPOZYC', 'DATA WAŻNOŚCI',
 ];
 
+/** Zero-pad a number to two digits. */
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+/** Format a Date as ISO YYYY-MM-DD. */
 function toIso(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Check that year/month/day form a real calendar date. */
 function isValidYmd(y: number, m: number, day: number): boolean {
   if (m < 1 || m > 12 || day < 1 || day > 31) return false;
   const d = new Date(y, m - 1, day);
   return d.getFullYear() === y && d.getMonth() === m - 1 && d.getDate() === day;
 }
 
+/** Reject dates far outside the plausible expiry window (±1y past, +12y future). */
 function isReasonable(d: Date): boolean {
   const now = new Date();
   const min = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
@@ -82,15 +86,24 @@ export function fixOcrMistakes(text: string): string {
       /(?<=\d)[OQILSBZG]+(?![A-Z])|(?<![A-Z])[OQILSBZG]+(?=\d)/g,
       (run) => [...run].map((c) => LETTER_DIGIT_CONFUSIONS[c] ?? c).join(''),
     )
+    // Confusable letter glued between a digit and a month name is a mistyped
+    // day digit: 3OJAN27 → 30JAN27. No trailing \b — the month is followed
+    // by year digits, which are word chars.
+    .replace(
+      /(?<=\d)[OQILSBZG]+(?=(?:JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:T(?:EMBER)?)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?|MAI|JUNI|JULI|OKT(?:OBER)?|DEZ(?:EMBER)?|MÄRZ|MAERZ|MARZ))/g,
+      (run) => [...run].map((c) => LETTER_DIGIT_CONFUSIONS[c] ?? c).join(''),
+    )
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+/** True when an expiry keyword appears within ~40 chars before the match. */
 function nearKeyword(text: string, matchIndex: number): boolean {
   const window = text.substring(Math.max(0, matchIndex - 40), matchIndex + 8);
   return EXPIRY_KEYWORDS.some((k) => window.includes(k));
 }
 
+/** True when lot/batch/serial markers appear near the match (likely not an expiry). */
 function nearLotNoise(text: string, matchIndex: number): boolean {
   const window = text.substring(Math.max(0, matchIndex - 12), matchIndex + 24);
   return /\b(LOT|BATCH|L\.|SN|SERIAL)\b/.test(window);
@@ -104,10 +117,12 @@ interface RawMatch {
   end: number;
 }
 
+/** Last calendar day of the given month (monthIndex is 0-based). */
 function endOfMonth(year: number, monthIndex: number): Date {
   return new Date(year, monthIndex + 1, 0);
 }
 
+/** Run every date pattern over the cleaned text and collect plausible matches. */
 function parseAllDates(cleaned: string): RawMatch[] {
   const results: RawMatch[] = [];
 
@@ -276,6 +291,7 @@ function dropContainedMatches(matches: RawMatch[]): RawMatch[] {
   });
 }
 
+/** Score a candidate 0–1 by pattern strength, keyword proximity, and expiry plausibility. */
 function scoreCandidate(match: RawMatch, text: string): number {
   let score = 0.15;
 
@@ -304,6 +320,7 @@ function scoreCandidate(match: RawMatch, text: string): number {
   return Math.max(0, Math.min(1, score));
 }
 
+/** Extract all plausible date candidates from OCR text, best confidence first. */
 export function extractDates(rawText: string): DateExtractionResult[] {
   const cleaned = fixOcrMistakes(rawText);
   const matches = parseAllDates(cleaned);

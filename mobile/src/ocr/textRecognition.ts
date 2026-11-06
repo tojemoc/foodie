@@ -35,6 +35,7 @@ export async function recognizeTextFromImageUri(uri: string): Promise<OcrResult>
   };
 }
 
+/** Return the on-device recognizer, or null when the native module isn't linked. */
 async function resolveRecognizer(): Promise<Recognizer | null> {
   try {
     // The JS bundle ships even when the native module is absent (e.g. a build
