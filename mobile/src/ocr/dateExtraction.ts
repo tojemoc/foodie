@@ -65,23 +65,23 @@ function isReasonable(d: Date): boolean {
   return d >= min && d <= max;
 }
 
+/** Common OCR letter→digit confusions on packaging fonts. */
+const LETTER_DIGIT_CONFUSIONS: Record<string, string> = {
+  O: '0', Q: '0', I: '1', L: '1', S: '5', B: '8', Z: '2', G: '6',
+};
+
 /** Common OCR confusions on packaging fonts. */
 export function fixOcrMistakes(text: string): string {
   return text
     .toUpperCase()
     .replace(/[|]/g, ' ')
     .replace(/\u00A0/g, ' ')
-    .replace(/O(?=\d)/g, '0')
-    .replace(/(?<=\d)O/g, '0')
-    .replace(/[Il](?=\d)/g, '1')
-    .replace(/(?<=\d)[Il]/g, '1')
-    .replace(/S(?=\d)/g, '5')
-    .replace(/(?<=\d)S/g, '5')
-    .replace(/B(?=\d)/g, '8')
-    .replace(/(?<=\d)B/g, '8')
-    .replace(/Z(?=\d)/g, '2')
-    .replace(/(?<=\d)Z/g, '2')
-    .replace(/G(?=\d)/g, '6')
+    // Only convert letters that touch a digit and aren't glued to other
+    // letters, so month names survive: 12AUG26, FEB26, DEZ2026.
+    .replace(
+      /(?<=\d)[OQILSBZG]+(?![A-Z])|(?<![A-Z])[OQILSBZG]+(?=\d)/g,
+      (run) => [...run].map((c) => LETTER_DIGIT_CONFUSIONS[c] ?? c).join(''),
+    )
     .replace(/\s+/g, ' ')
     .trim();
 }

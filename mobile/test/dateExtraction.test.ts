@@ -32,6 +32,16 @@ describe('fixOcrMistakes', () => {
     assert.match(fixOcrMistakes('USE BY 2O/O6/2O26'), /20\/06\/2026/);
     assert.ok(ocr.length > 0);
   });
+
+  it('converts lowercase l next to digits (dead case after toUpperCase)', () => {
+    assert.match(fixOcrMistakes('EXP l2.O5.2O26'), /12\.05\.2026/);
+  });
+
+  it('does not corrupt month names glued to digits', () => {
+    assert.match(fixOcrMistakes('USE BY 12AUG26'), /12AUG26/);
+    assert.match(fixOcrMistakes('EXP FEB26'), /FEB26/);
+    assert.match(fixOcrMistakes('MHD DEZ2026'), /DEZ2026/);
+  });
 });
 
 describe('extractDates', () => {
@@ -64,6 +74,12 @@ describe('extractDates', () => {
     const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
     const label = `Use by ${pad(d)} ${months[m - 1]} ${y}`;
     assert.equal(bestExpiryDate(label), iso);
+  });
+
+  it('parses DDMMMYY glued month-name dates', () => {
+    const { d, m, y, iso } = isoDaysFromNow(200);
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    assert.equal(bestExpiryDate(`USE BY ${d}${months[m - 1]}${String(y).slice(-2)}`), iso);
   });
 
   it('parses unambiguous US MM/DD/YYYY when day > 12', () => {

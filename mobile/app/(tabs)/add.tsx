@@ -180,10 +180,7 @@ export default function AddItemScreen() {
     setLoading(true);
     setStatusMsg('Reading best-before date…');
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        skipProcessing: true,
-      });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (!photo?.uri) throw new Error('No photo');
       const ocr = await recognizeTextFromImageUri(photo.uri);
       setOcrRaw(ocr.text);
