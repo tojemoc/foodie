@@ -20,7 +20,9 @@
     "appPermissions": {
       "entitlements": [],
       "privacy": {
-        "NSCameraUsageDescription": "Foodie scans barcodes, best-before dates, and produce photos."
+        "NSCameraUsageDescription": "Foodie scans barcodes, best-before dates, and produce photos.",
+        "NSPhotoLibraryUsageDescription": "Foodie can import food photos for offline recognition.",
+        "NSFaceIDUsageDescription": "Foodie uses Face ID to unlock your saved session."
       }
     }
   }

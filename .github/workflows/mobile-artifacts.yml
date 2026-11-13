@@ -89,6 +89,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: node --test scripts/ios-sidestore-marketing-version.test.mjs
 
+      - name: AltStore permission-sync tests
+        working-directory: ${{ github.workspace }}
+        run: python3 -m unittest discover -s scripts -p 'test_sync_altstore_permissions.py'
+
   build-ios:
     needs: validate-mobile
     # Expo SDK 57 / expo-modules-jsi requires Swift tools 6.2+ (Xcode 26.4+).
@@ -493,6 +497,18 @@ jobs:
           echo "tag=${FLAVOR}-v${VERSION}-build${BUILD}" >> "$GITHUB_OUTPUT"
           echo "has_apk=${has_apk}" >> "$GITHUB_OUTPUT"
           ls -la release/ios/ release/android/ || true
+
+      - name: Sync AltStore permissions from IPA
+        run: |
+          set -euo pipefail
+          IPA="$(find release/ios -maxdepth 1 -type f -name '*.ipa' -print -quit)"
+          if [ -z "$IPA" ]; then
+            echo "::error::No IPA found to sync AltStore permissions."
+            exit 1
+          fi
+          python3 scripts/sync-altstore-permissions.py "$IPA" \
+            --source docs/altstore-source.meta.json \
+            --bundle-id sk.tjm.foodie
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
