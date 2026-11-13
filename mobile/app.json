@@ -15,6 +15,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Foodie scans barcodes, best-before dates, and produce photos.",
         "NSPhotoLibraryUsageDescription": "Foodie can import food photos for offline recognition.",
+        "NSFaceIDUsageDescription": "Foodie uses Face ID to unlock your saved session.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "associatedDomains": ["applinks:REPLACE_WITH_FRONTEND_HOST"]
